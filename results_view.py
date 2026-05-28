@@ -2,7 +2,6 @@ import os
 import csv
 from pathlib import Path
 import tkinter as tk
-from tkinter import messagebox
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -12,27 +11,12 @@ from config import (
     SIDEBAR_BG,
     PANEL_BG,
     CARD_BG,
-    CARD_BG_2,
     TEXT_MAIN,
     TEXT_MUTED,
     BLUE,
     heatmap_output_file,
     zone_report_file,
 )
-
-
-# ============================================================
-# RESULTADOS / VER GRÁFICAS
-# ============================================================
-# Este archivo crea una pantalla independiente para visualizar datos.
-# Por ahora lee los CSV que ya genera el proyecto.
-# Más adelante leerá también:
-# - analytics_summary.csv
-# - store_metrics.csv
-# - time_bins.csv
-# - stair_metrics.csv
-# - zone_events.csv
-# ============================================================
 
 
 class ResultsView(ctk.CTkFrame):
@@ -51,7 +35,6 @@ class ResultsView(ctk.CTkFrame):
         self.summary_path = self.project_dir / "analytics_summary.csv"
 
         self.heatmap_image_ref = None
-        self.expanded_cards = {}
 
         self.zone_rows = []
         self.store_rows = []
@@ -75,9 +58,13 @@ class ResultsView(ctk.CTkFrame):
                 reader = csv.DictReader(file)
                 return list(reader)
         except UnicodeDecodeError:
-            with open(path, "r", encoding="latin-1") as file:
-                reader = csv.DictReader(file)
-                return list(reader)
+            try:
+                with open(path, "r", encoding="latin-1") as file:
+                    reader = csv.DictReader(file)
+                    return list(reader)
+            except Exception as error:
+                print(f"No se pudo leer {path}: {error}")
+                return []
         except Exception as error:
             print(f"No se pudo leer {path}: {error}")
             return []
@@ -351,14 +338,7 @@ class ResultsView(ctk.CTkFrame):
             canvas.delete("all")
 
             if not self.heatmap_path.exists():
-                canvas.create_text(
-                    max(canvas.winfo_width() // 2, 120),
-                    max(canvas.winfo_height() // 2, 80),
-                    text="No existe heatmap_final.png\nEjecuta un análisis primero.",
-                    fill="#AAB2C0",
-                    font=("Segoe UI", 15, "bold"),
-                    justify="center",
-                )
+                self.draw_empty_state(canvas, "Sin heatmap")
                 return
 
             try:
@@ -373,6 +353,7 @@ class ResultsView(ctk.CTkFrame):
                 y = int((ch - new_size[1]) / 2)
                 canvas.create_image(x, y, anchor="nw", image=self.heatmap_image_ref)
             except Exception as error:
+                canvas.delete("all")
                 canvas.create_text(
                     max(canvas.winfo_width() // 2, 120),
                     max(canvas.winfo_height() // 2, 80),
@@ -397,11 +378,7 @@ class ResultsView(ctk.CTkFrame):
         chart.pack(fill="both", expand=True, padx=18, pady=(0, 22))
 
         def render_chart(event=None):
-            self.draw_horizontal_bar_chart(
-                chart,
-                ranking_data,
-                empty_text="Sin datos de zonas. Ejecuta un análisis primero.",
-            )
+            self.draw_horizontal_bar_chart(chart, ranking_data)
 
         chart.bind("<Configure>", render_chart)
         chart.after(100, render_chart)
@@ -418,11 +395,7 @@ class ResultsView(ctk.CTkFrame):
         chart.pack(fill="both", expand=True, padx=18, pady=(0, 22))
 
         def render_chart(event=None):
-            self.draw_line_chart(
-                chart,
-                time_data,
-                empty_text="Aún no existe time_bins.csv.\nLo generaremos en la siguiente fase.",
-            )
+            self.draw_line_chart(chart, time_data)
 
         chart.bind("<Configure>", render_chart)
         chart.after(100, render_chart)
@@ -439,11 +412,7 @@ class ResultsView(ctk.CTkFrame):
         chart.pack(fill="both", expand=True, padx=18, pady=(0, 22))
 
         def render_chart(event=None):
-            self.draw_grouped_bar_chart(
-                chart,
-                stair_data,
-                empty_text="Aún no existe stair_metrics.csv.\nLo generaremos en la siguiente fase.",
-            )
+            self.draw_grouped_bar_chart(chart, stair_data)
 
         chart.bind("<Configure>", render_chart)
         chart.after(100, render_chart)
@@ -486,76 +455,58 @@ class ResultsView(ctk.CTkFrame):
         return rows
 
     # ============================================================
-    # DIBUJO DE GRÁFICOS EN CANVAS
+    # DIBUJO DE GRÁFICOS
     # ============================================================
 
-def draw_empty_state(self, canvas, text):
-    canvas.delete("all")
+    def draw_empty_state(self, canvas, text="Sin datos registrados todavía"):
+        canvas.delete("all")
 
-    width = max(canvas.winfo_width(), 320)
-    height = max(canvas.winfo_height(), 220)
+        width = max(canvas.winfo_width(), 320)
+        height = max(canvas.winfo_height(), 220)
 
-    left = 48
-    right = 28
-    top = 28
-    bottom = 46
+        left = 48
+        right = 28
+        top = 28
+        bottom = 46
 
-    usable_w = width - left - right
-    usable_h = height - top - bottom
+        usable_w = width - left - right
+        usable_h = height - top - bottom
 
-    # Ejes base vacíos
-    canvas.create_line(left, top, left, top + usable_h, fill="#30384A", width=1)
-    canvas.create_line(left, top + usable_h, left + usable_w, top + usable_h, fill="#30384A", width=1)
+        canvas.create_line(left, top, left, top + usable_h, fill="#30384A", width=1)
+        canvas.create_line(left, top + usable_h, left + usable_w, top + usable_h, fill="#30384A", width=1)
 
-    # Líneas guía suaves
-    for i in range(5):
-        y = top + int((usable_h / 4) * i)
-        canvas.create_line(left, y, left + usable_w, y, fill="#1E2635", width=1)
+        for i in range(5):
+            y = top + int((usable_h / 4) * i)
+            canvas.create_line(left, y, left + usable_w, y, fill="#1E2635", width=1)
+            canvas.create_text(
+                left - 10,
+                y,
+                anchor="e",
+                text="0",
+                fill="#7D8797",
+                font=("Segoe UI", 10),
+            )
+
+        zero_y = top + usable_h
+        canvas.create_line(left, zero_y, left + usable_w, zero_y, fill=BLUE, width=3)
+
+        for i in range(6):
+            x = left + int((usable_w / 5) * i)
+            canvas.create_oval(x - 4, zero_y - 4, x + 4, zero_y + 4, fill=BLUE, outline="")
+
         canvas.create_text(
-            left - 10,
-            y,
-            anchor="e",
-            text="0",
-            fill="#7D8797",
-            font=("Segoe UI", 10)
+            left,
+            height - 18,
+            anchor="w",
+            text="Sin datos registrados todavía",
+            fill=TEXT_MUTED,
+            font=("Segoe UI", 11, "bold"),
         )
 
-    # Línea plana en cero
-    zero_y = top + usable_h
-    canvas.create_line(
-        left,
-        zero_y,
-        left + usable_w,
-        zero_y,
-        fill=BLUE,
-        width=3
-    )
-
-    # Puntos vacíos de referencia
-    for i in range(6):
-        x = left + int((usable_w / 5) * i)
-        canvas.create_oval(
-            x - 4,
-            zero_y - 4,
-            x + 4,
-            zero_y + 4,
-            fill=BLUE,
-            outline=""
-        )
-
-    canvas.create_text(
-        left,
-        height - 18,
-        anchor="w",
-        text="Sin datos registrados todavía",
-        fill=TEXT_MUTED,
-        font=("Segoe UI", 11, "bold")
-    )
-
-    def draw_horizontal_bar_chart(self, canvas, data, empty_text):
+    def draw_horizontal_bar_chart(self, canvas, data):
         canvas.delete("all")
         if not data:
-            self.draw_empty_state(canvas, empty_text)
+            self.draw_empty_state(canvas)
             return
 
         width = max(canvas.winfo_width(), 320)
@@ -582,10 +533,10 @@ def draw_empty_state(self, canvas, text):
             canvas.create_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, fill=BLUE, outline="")
             canvas.create_text(bar_x + bar_area_width + 10, y + 16, anchor="w", text=str(value), fill=TEXT_MUTED, font=("Segoe UI", 11))
 
-    def draw_line_chart(self, canvas, data, empty_text):
+    def draw_line_chart(self, canvas, data):
         canvas.delete("all")
         if not data:
-            self.draw_empty_state(canvas, empty_text)
+            self.draw_empty_state(canvas)
             return
 
         width = max(canvas.winfo_width(), 320)
@@ -604,6 +555,10 @@ def draw_empty_state(self, canvas, text):
         canvas.create_line(left, top, left, top + usable_h, fill="#30384A", width=1)
         canvas.create_line(left, top + usable_h, left + usable_w, top + usable_h, fill="#30384A", width=1)
 
+        for i in range(5):
+            y = top + int((usable_h / 4) * i)
+            canvas.create_line(left, y, left + usable_w, y, fill="#1E2635", width=1)
+
         points = []
         for i, (_, value) in enumerate(data):
             x = left + int((i / max(len(data) - 1, 1)) * usable_w)
@@ -620,10 +575,10 @@ def draw_empty_state(self, canvas, text):
         canvas.create_text(left, top, anchor="e", text=str(max_value), fill=TEXT_MUTED, font=("Segoe UI", 10))
         canvas.create_text(left, top + usable_h, anchor="e", text=str(min_value), fill=TEXT_MUTED, font=("Segoe UI", 10))
 
-    def draw_grouped_bar_chart(self, canvas, data, empty_text):
+    def draw_grouped_bar_chart(self, canvas, data):
         canvas.delete("all")
         if not data:
-            self.draw_empty_state(canvas, empty_text)
+            self.draw_empty_state(canvas)
             return
 
         width = max(canvas.winfo_width(), 320)
@@ -702,12 +657,7 @@ def draw_empty_state(self, canvas, text):
         zone_type = row.get("zone_type", row.get("type", ""))
         entry_count = row.get("entry_count", row.get("entries", "0"))
 
-        title = ctk.CTkLabel(
-            header,
-            text=name,
-            font=("Segoe UI", 17, "bold"),
-            text_color=TEXT_MAIN,
-        )
+        title = ctk.CTkLabel(header, text=name, font=("Segoe UI", 17, "bold"), text_color=TEXT_MAIN)
         title.pack(side="left")
 
         summary = ctk.CTkLabel(
@@ -776,4 +726,4 @@ def draw_empty_state(self, canvas, text):
         if self.on_back:
             self.on_back()
         else:
-            self.master.destroy()
+            self.destroy()

@@ -33,10 +33,12 @@ class ResultsView(ctk.CTkFrame):
         self.time_bins_path = self.project_dir / "time_bins.csv"
         self.stair_metrics_path = self.project_dir / "stair_metrics.csv"
         self.summary_path = self.project_dir / "analytics_summary.csv"
+        self.zone_metrics_path = self.project_dir / "zone_metrics.csv"
 
         self.heatmap_image_ref = None
 
         self.zone_rows = []
+        self.zone_metric_rows = []
         self.store_rows = []
         self.time_rows = []
         self.stair_rows = []
@@ -71,6 +73,7 @@ class ResultsView(ctk.CTkFrame):
 
     def load_data(self):
         self.zone_rows = self.read_csv_dicts(self.zone_report_path)
+        self.zone_metric_rows = self.read_csv_dicts(self.zone_metrics_path)
         self.store_rows = self.read_csv_dicts(self.store_metrics_path)
         self.time_rows = self.read_csv_dicts(self.time_bins_path)
         self.stair_rows = self.read_csv_dicts(self.stair_metrics_path)
@@ -94,6 +97,7 @@ class ResultsView(ctk.CTkFrame):
             "total_store_entries": self.estimate_store_entries(),
             "avg_dwell_time": "—",
             "total_zones": str(total_zones),
+            "flow_heatmap_points": "0",
         }
 
     def estimate_store_entries(self):
@@ -116,11 +120,8 @@ class ResultsView(ctk.CTkFrame):
         except Exception:
             return 0.0
 
-    def format_seconds(self, seconds):
-        seconds = int(self.safe_float(seconds))
-        minutes = seconds // 60
-        remaining_seconds = seconds % 60
-        return f"{minutes:02d}:{remaining_seconds:02d}"
+    def format_percent(self, value):
+        return f"{value * 100:.1f}%"
 
     # ============================================================
     # UI PRINCIPAL
@@ -189,7 +190,7 @@ class ResultsView(ctk.CTkFrame):
         header.pack(anchor="w", padx=44, pady=(34, 4))
 
         subtitle_text = "Resumen visual del último análisis generado por YOLO."
-        if not self.zone_report_path.exists():
+        if not self.zone_report_path.exists() and not self.store_metrics_path.exists():
             subtitle_text = "Todavía no hay datos suficientes. Ejecuta primero un análisis de video."
 
         subtitle = ctk.CTkLabel(
@@ -210,9 +211,9 @@ class ResultsView(ctk.CTkFrame):
         self.create_kpi_card(
             kpi_frame,
             column=0,
-            title="Personas únicas",
+            title="Personas validadas",
             value=self.summary.get("total_people", "—"),
-            description="Track IDs únicos detectados",
+            description="Personas confirmadas por filtros estadísticos",
             accent="#2F80ED",
         )
 
@@ -221,7 +222,7 @@ class ResultsView(ctk.CTkFrame):
             column=1,
             title="Entradas a zonas",
             value=self.summary.get("total_zone_entries", "0"),
-            description="Cruces detectados en áreas demarcadas",
+            description="Cruces válidos en áreas demarcadas",
             accent="#27AE60",
         )
 
@@ -237,9 +238,9 @@ class ResultsView(ctk.CTkFrame):
         self.create_kpi_card(
             kpi_frame,
             column=3,
-            title="Permanencia prom.",
-            value=self.summary.get("avg_dwell_time", "—"),
-            description="Tiempo promedio estimado",
+            title="Flujo heatmap",
+            value=self.summary.get("flow_heatmap_points", "0"),
+            description="Puntos de movimiento real usados",
             accent="#8E44AD",
         )
 
@@ -250,28 +251,13 @@ class ResultsView(ctk.CTkFrame):
         accent_bar = ctk.CTkFrame(card, height=5, fg_color=accent, corner_radius=5)
         accent_bar.pack(fill="x", padx=18, pady=(18, 14))
 
-        title_label = ctk.CTkLabel(
-            card,
-            text=title,
-            font=("Segoe UI", 14, "bold"),
-            text_color=TEXT_MUTED,
-        )
+        title_label = ctk.CTkLabel(card, text=title, font=("Segoe UI", 14, "bold"), text_color=TEXT_MUTED)
         title_label.pack(anchor="w", padx=20, pady=(0, 2))
 
-        value_label = ctk.CTkLabel(
-            card,
-            text=str(value),
-            font=("Segoe UI", 34, "bold"),
-            text_color=TEXT_MAIN,
-        )
+        value_label = ctk.CTkLabel(card, text=str(value), font=("Segoe UI", 34, "bold"), text_color=TEXT_MAIN)
         value_label.pack(anchor="w", padx=20, pady=(0, 2))
 
-        desc_label = ctk.CTkLabel(
-            card,
-            text=description,
-            font=("Segoe UI", 12),
-            text_color="#7D8797",
-        )
+        desc_label = ctk.CTkLabel(card, text=description, font=("Segoe UI", 12), text_color="#7D8797")
         desc_label.pack(anchor="w", padx=20, pady=(0, 18))
 
     # ============================================================
@@ -296,18 +282,17 @@ class ResultsView(ctk.CTkFrame):
         stair_card = ctk.CTkFrame(grid, fg_color=PANEL_BG, corner_radius=26)
         stair_card.grid(row=1, column=1, padx=8, pady=8, sticky="nsew")
 
+        store_flow_card = ctk.CTkFrame(grid, fg_color=PANEL_BG, corner_radius=26)
+        store_flow_card.grid(row=2, column=0, columnspan=2, padx=8, pady=8, sticky="nsew")
+
         self.build_heatmap_card(heatmap_card)
         self.build_ranking_card(ranking_card)
         self.build_time_card(time_card)
         self.build_stair_card(stair_card)
+        self.build_store_flow_card(store_flow_card)
 
     def build_card_title(self, parent, title, subtitle=None):
-        title_label = ctk.CTkLabel(
-            parent,
-            text=title,
-            font=("Segoe UI", 22, "bold"),
-            text_color=TEXT_MAIN,
-        )
+        title_label = ctk.CTkLabel(parent, text=title, font=("Segoe UI", 22, "bold"), text_color=TEXT_MAIN)
         title_label.pack(anchor="w", padx=24, pady=(22, 2))
 
         if subtitle:
@@ -316,7 +301,7 @@ class ResultsView(ctk.CTkFrame):
                 text=subtitle,
                 font=("Segoe UI", 13),
                 text_color=TEXT_MUTED,
-                wraplength=520,
+                wraplength=780,
                 justify="left",
             )
             subtitle_label.pack(anchor="w", padx=24, pady=(0, 14))
@@ -324,8 +309,8 @@ class ResultsView(ctk.CTkFrame):
     def build_heatmap_card(self, parent):
         self.build_card_title(
             parent,
-            "Mapa de calor",
-            "Visualiza las zonas de mayor concentración durante el video.",
+            "Mapa de calor por flujo real",
+            "Calculado con movimiento efectivo. Personas estáticas o semi-estáticas no generan zonas rojas falsas.",
         )
 
         image_container = ctk.CTkFrame(parent, fg_color="#070A11", corner_radius=18)
@@ -338,7 +323,7 @@ class ResultsView(ctk.CTkFrame):
             canvas.delete("all")
 
             if not self.heatmap_path.exists():
-                self.draw_empty_state(canvas, "Sin heatmap")
+                self.draw_empty_state(canvas)
                 return
 
             try:
@@ -353,7 +338,6 @@ class ResultsView(ctk.CTkFrame):
                 y = int((ch - new_size[1]) / 2)
                 canvas.create_image(x, y, anchor="nw", image=self.heatmap_image_ref)
             except Exception as error:
-                canvas.delete("all")
                 canvas.create_text(
                     max(canvas.winfo_width() // 2, 120),
                     max(canvas.winfo_height() // 2, 80),
@@ -367,11 +351,7 @@ class ResultsView(ctk.CTkFrame):
         canvas.after(100, render_heatmap)
 
     def build_ranking_card(self, parent):
-        self.build_card_title(
-            parent,
-            "Ranking de zonas",
-            "Ordenado por cruces detectados en cada área.",
-        )
+        self.build_card_title(parent, "Ranking de zonas", "Ordenado por cruces detectados en cada área.")
 
         ranking_data = self.get_ranking_data()
         chart = tk.Canvas(parent, bg=PANEL_BG, highlightthickness=0, height=360)
@@ -384,11 +364,7 @@ class ResultsView(ctk.CTkFrame):
         chart.after(100, render_chart)
 
     def build_time_card(self, parent):
-        self.build_card_title(
-            parent,
-            "Flujo temporal",
-            "Permite detectar momentos de mayor tránsito durante el video.",
-        )
+        self.build_card_title(parent, "Flujo temporal", "Momentos de mayor presencia validada durante el video.")
 
         time_data = self.get_time_data()
         chart = tk.Canvas(parent, bg=PANEL_BG, highlightthickness=0, height=280)
@@ -401,11 +377,7 @@ class ResultsView(ctk.CTkFrame):
         chart.after(100, render_chart)
 
     def build_stair_card(self, parent):
-        self.build_card_title(
-            parent,
-            "Uso de escaleras",
-            "Comparación de subidas y bajadas por escalera.",
-        )
+        self.build_card_title(parent, "Uso de escaleras", "Comparación de subidas y bajadas por escalera.")
 
         stair_data = self.get_stair_data()
         chart = tk.Canvas(parent, bg=PANEL_BG, highlightthickness=0, height=280)
@@ -413,6 +385,23 @@ class ResultsView(ctk.CTkFrame):
 
         def render_chart(event=None):
             self.draw_grouped_bar_chart(chart, stair_data)
+
+        chart.bind("<Configure>", render_chart)
+        chart.after(100, render_chart)
+
+    def build_store_flow_card(self, parent):
+        self.build_card_title(
+            parent,
+            "Comparación de flujo entre tiendas",
+            "Distribución porcentual del tránsito exterior por tienda. Si no hay zonas de frente de tienda, usa cruces de puerta como respaldo.",
+        )
+
+        store_flow_data = self.get_store_flow_data()
+        chart = tk.Canvas(parent, bg=PANEL_BG, highlightthickness=0, height=360)
+        chart.pack(fill="both", expand=True, padx=18, pady=(0, 22))
+
+        def render_chart(event=None):
+            self.draw_store_flow_donut_chart(chart, store_flow_data)
 
         chart.bind("<Configure>", render_chart)
         chart.after(100, render_chart)
@@ -425,23 +414,59 @@ class ResultsView(ctk.CTkFrame):
         if self.store_rows:
             rows = []
             for row in self.store_rows:
-                name = row.get("store_name") or row.get("zone_name") or row.get("name") or "Tienda"
-                value = self.safe_int(row.get("exterior_traffic", row.get("entries", 0)))
+                name = row.get("store_name") or "Tienda"
+                value = self.safe_int(row.get("exterior_traffic", 0))
+                if value <= 0:
+                    value = self.safe_int(row.get("door_crossings", 0))
+                if value <= 0:
+                    value = self.safe_int(row.get("estimated_entries", 0))
                 rows.append((name, value))
             return sorted(rows, key=lambda x: x[1], reverse=True)[:8]
 
         rows = []
-        for row in self.zone_rows:
+        source_rows = self.zone_metric_rows if self.zone_metric_rows else self.zone_rows
+        for row in source_rows:
             name = row.get("zone_name") or row.get("zone_id") or "Zona"
             value = self.safe_int(row.get("entry_count", 0))
             rows.append((name, value))
+        return sorted(rows, key=lambda x: x[1], reverse=True)[:8]
+
+    def get_store_flow_data(self):
+        rows = []
+
+        # Fuente principal: store_metrics.csv
+        if self.store_rows:
+            for row in self.store_rows:
+                name = row.get("store_name") or "Tienda"
+                value = self.safe_int(row.get("exterior_traffic", 0))
+
+                # Respaldo si todavía no marcaste frentes de tienda.
+                if value <= 0:
+                    value = self.safe_int(row.get("door_crossings", 0))
+                if value <= 0:
+                    value = self.safe_int(row.get("estimated_entries", 0))
+
+                if value > 0:
+                    rows.append((name, value))
+
+        # Fuente secundaria: zone_metrics.csv o reporte_zonas.csv
+        if not rows:
+            source_rows = self.zone_metric_rows if self.zone_metric_rows else self.zone_rows
+            for row in source_rows:
+                zone_type = str(row.get("zone_type", "")).lower()
+                if zone_type in ["frente_tienda", "puerta"]:
+                    name = row.get("zone_name") or row.get("zone_id") or "Tienda"
+                    value = self.safe_int(row.get("entry_count", 0))
+                    if value > 0:
+                        rows.append((name, value))
+
         return sorted(rows, key=lambda x: x[1], reverse=True)[:8]
 
     def get_time_data(self):
         rows = []
         for row in self.time_rows:
             label = row.get("time_label") or row.get("interval") or row.get("time_bin") or ""
-            value = self.safe_int(row.get("people_count", row.get("traffic", 0)))
+            value = self.safe_int(row.get("visible_people_max", row.get("people_count", 0)))
             rows.append((label, value))
         return rows
 
@@ -463,12 +488,10 @@ class ResultsView(ctk.CTkFrame):
 
         width = max(canvas.winfo_width(), 320)
         height = max(canvas.winfo_height(), 220)
-
         left = 48
         right = 28
         top = 28
         bottom = 46
-
         usable_w = width - left - right
         usable_h = height - top - bottom
 
@@ -478,14 +501,7 @@ class ResultsView(ctk.CTkFrame):
         for i in range(5):
             y = top + int((usable_h / 4) * i)
             canvas.create_line(left, y, left + usable_w, y, fill="#1E2635", width=1)
-            canvas.create_text(
-                left - 10,
-                y,
-                anchor="e",
-                text="0",
-                fill="#7D8797",
-                font=("Segoe UI", 10),
-            )
+            canvas.create_text(left - 10, y, anchor="e", text="0", fill="#7D8797", font=("Segoe UI", 10))
 
         zero_y = top + usable_h
         canvas.create_line(left, zero_y, left + usable_w, zero_y, fill=BLUE, width=3)
@@ -494,14 +510,7 @@ class ResultsView(ctk.CTkFrame):
             x = left + int((usable_w / 5) * i)
             canvas.create_oval(x - 4, zero_y - 4, x + 4, zero_y + 4, fill=BLUE, outline="")
 
-        canvas.create_text(
-            left,
-            height - 18,
-            anchor="w",
-            text="Sin datos registrados todavía",
-            fill=TEXT_MUTED,
-            font=("Segoe UI", 11, "bold"),
-        )
+        canvas.create_text(left, height - 18, anchor="w", text=text, fill=TEXT_MUTED, font=("Segoe UI", 11, "bold"))
 
     def draw_horizontal_bar_chart(self, canvas, data):
         canvas.delete("all")
@@ -521,7 +530,6 @@ class ResultsView(ctk.CTkFrame):
         for i, (label, value) in enumerate(data):
             y = top + i * row_height
             short_label = label if len(label) <= 22 else label[:19] + "..."
-
             canvas.create_text(left, y + 16, anchor="w", text=short_label, fill=TEXT_MAIN, font=("Segoe UI", 11, "bold"))
 
             bar_x = left + 150
@@ -545,7 +553,6 @@ class ResultsView(ctk.CTkFrame):
         right = 24
         top = 20
         bottom = 45
-
         values = [value for _, value in data]
         max_value = max(values + [1])
         min_value = min(values + [0])
@@ -589,7 +596,6 @@ class ResultsView(ctk.CTkFrame):
         bottom = 55
         usable_w = width - left - right
         usable_h = height - top - bottom
-
         max_value = max([max(up, down) for _, up, down in data] + [1])
         group_w = usable_w / max(len(data), 1)
 
@@ -598,10 +604,8 @@ class ResultsView(ctk.CTkFrame):
         for i, (name, up, down) in enumerate(data):
             group_x = left + i * group_w
             bar_w = max(12, int(group_w * 0.22))
-
             up_h = int((up / max_value) * usable_h)
             down_h = int((down / max_value) * usable_h)
-
             x1 = int(group_x + group_w * 0.25)
             x2 = int(group_x + group_w * 0.55)
             base_y = top + usable_h
@@ -614,6 +618,118 @@ class ResultsView(ctk.CTkFrame):
 
         canvas.create_text(left + 10, top + 8, anchor="w", text="Verde: suben | Rojo: bajan", fill=TEXT_MUTED, font=("Segoe UI", 10))
 
+    def draw_store_flow_donut_chart(self, canvas, data):
+        canvas.delete("all")
+        if not data:
+            self.draw_empty_state(canvas, "Sin flujo por tienda registrado todavía")
+            return
+
+        width = max(canvas.winfo_width(), 520)
+        height = max(canvas.winfo_height(), 300)
+        total = sum(value for _, value in data)
+        if total <= 0:
+            self.draw_empty_state(canvas, "Sin flujo por tienda registrado todavía")
+            return
+
+        colors = ["#2F80ED", "#27AE60", "#F2994A", "#8E44AD", "#EB5757", "#00A8FF", "#F2C94C", "#56CCF2"]
+
+        diameter = min(height - 70, width * 0.34, 240)
+        x0 = 48
+        y0 = int((height - diameter) / 2)
+        x1 = x0 + diameter
+        y1 = y0 + diameter
+
+        start_angle = 90
+        for index, (name, value) in enumerate(data):
+            extent = (value / total) * 360
+            canvas.create_arc(
+                x0,
+                y0,
+                x1,
+                y1,
+                start=start_angle,
+                extent=-extent,
+                fill=colors[index % len(colors)],
+                outline=PANEL_BG,
+                width=2,
+            )
+            start_angle -= extent
+
+        inner_margin = diameter * 0.28
+        canvas.create_oval(
+            x0 + inner_margin,
+            y0 + inner_margin,
+            x1 - inner_margin,
+            y1 - inner_margin,
+            fill=PANEL_BG,
+            outline=PANEL_BG,
+        )
+        canvas.create_text(
+            x0 + diameter / 2,
+            y0 + diameter / 2 - 10,
+            text=str(total),
+            fill=TEXT_MAIN,
+            font=("Segoe UI", 26, "bold"),
+        )
+        canvas.create_text(
+            x0 + diameter / 2,
+            y0 + diameter / 2 + 18,
+            text="cruces",
+            fill=TEXT_MUTED,
+            font=("Segoe UI", 11, "bold"),
+        )
+
+        legend_x = int(x1 + 48)
+        legend_y = 36
+        row_h = 34
+
+        canvas.create_text(
+            legend_x,
+            legend_y - 16,
+            anchor="w",
+            text="Distribución de flujo exterior",
+            fill=TEXT_MAIN,
+            font=("Segoe UI", 14, "bold"),
+        )
+
+        for index, (name, value) in enumerate(data):
+            percent = value / total
+            y = legend_y + index * row_h
+            color = colors[index % len(colors)]
+            short_name = name if len(name) <= 30 else name[:27] + "..."
+
+            canvas.create_oval(legend_x, y, legend_x + 14, y + 14, fill=color, outline="")
+            canvas.create_text(
+                legend_x + 24,
+                y + 7,
+                anchor="w",
+                text=short_name,
+                fill=TEXT_MAIN,
+                font=("Segoe UI", 11, "bold"),
+            )
+            canvas.create_text(
+                width - 130,
+                y + 7,
+                anchor="w",
+                text=f"{value} cruces",
+                fill=TEXT_MUTED,
+                font=("Segoe UI", 11),
+            )
+            canvas.create_text(
+                width - 44,
+                y + 7,
+                anchor="e",
+                text=self.format_percent(percent),
+                fill=TEXT_MAIN,
+                font=("Segoe UI", 11, "bold"),
+            )
+
+            bar_x = legend_x + 24
+            bar_y = y + 19
+            bar_w = max(120, width - bar_x - 64)
+            canvas.create_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + 6, fill="#202838", outline="")
+            canvas.create_rectangle(bar_x, bar_y, bar_x + int(bar_w * percent), bar_y + 6, fill=color, outline="")
+
     # ============================================================
     # DETALLE EXPANDIBLE
     # ============================================================
@@ -622,15 +738,10 @@ class ResultsView(ctk.CTkFrame):
         section = ctk.CTkFrame(self.content, fg_color="transparent")
         section.pack(fill="x", padx=40, pady=(12, 40))
 
-        title = ctk.CTkLabel(
-            section,
-            text="Detalle por zona / tienda",
-            font=("Segoe UI", 28, "bold"),
-            text_color=TEXT_MAIN,
-        )
+        title = ctk.CTkLabel(section, text="Detalle por zona / tienda", font=("Segoe UI", 28, "bold"), text_color=TEXT_MAIN)
         title.pack(anchor="w", padx=8, pady=(20, 12))
 
-        rows = self.store_rows if self.store_rows else self.zone_rows
+        rows = self.store_rows if self.store_rows else self.zone_metric_rows if self.zone_metric_rows else self.zone_rows
         if not rows:
             empty = ctk.CTkFrame(section, fg_color=PANEL_BG, corner_radius=22)
             empty.pack(fill="x", padx=8, pady=8)
@@ -654,15 +765,15 @@ class ResultsView(ctk.CTkFrame):
         header.pack(fill="x", padx=18, pady=14)
 
         name = row.get("store_name") or row.get("zone_name") or row.get("zone_id") or row.get("name") or f"Elemento {index + 1}"
-        zone_type = row.get("zone_type", row.get("type", ""))
-        entry_count = row.get("entry_count", row.get("entries", "0"))
+        zone_type = row.get("zone_type", row.get("type", "tienda"))
+        entry_count = row.get("entry_count", row.get("exterior_traffic", row.get("estimated_entries", "0")))
 
         title = ctk.CTkLabel(header, text=name, font=("Segoe UI", 17, "bold"), text_color=TEXT_MAIN)
         title.pack(side="left")
 
         summary = ctk.CTkLabel(
             header,
-            text=f"{zone_type}  |  cruces: {entry_count}",
+            text=f"{zone_type}  |  valor principal: {entry_count}",
             font=("Segoe UI", 13),
             text_color=TEXT_MUTED,
         )

@@ -1,0 +1,42 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Base de datos local
+usuarios.db
+
+# Resultados generados
+heatmap_final.png
+reporte_zonas.csv
+zonas_configuradas.json
+analytics_summary.csv
+store_metrics.csv
+time_bins.csv
+stair_metrics.csv
+zone_events.csv
+person_tracks.csv
+
+# Videos locales pesados
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*.m4v
+
+# Pesos/modelos descargados
+*.pt
+
+# Configuración de editores
+.vscode/

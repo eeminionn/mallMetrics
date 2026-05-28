@@ -489,16 +489,68 @@ class ResultsView(ctk.CTkFrame):
     # DIBUJO DE GRÁFICOS EN CANVAS
     # ============================================================
 
-    def draw_empty_state(self, canvas, text):
-        canvas.delete("all")
+def draw_empty_state(self, canvas, text):
+    canvas.delete("all")
+
+    width = max(canvas.winfo_width(), 320)
+    height = max(canvas.winfo_height(), 220)
+
+    left = 48
+    right = 28
+    top = 28
+    bottom = 46
+
+    usable_w = width - left - right
+    usable_h = height - top - bottom
+
+    # Ejes base vacíos
+    canvas.create_line(left, top, left, top + usable_h, fill="#30384A", width=1)
+    canvas.create_line(left, top + usable_h, left + usable_w, top + usable_h, fill="#30384A", width=1)
+
+    # Líneas guía suaves
+    for i in range(5):
+        y = top + int((usable_h / 4) * i)
+        canvas.create_line(left, y, left + usable_w, y, fill="#1E2635", width=1)
         canvas.create_text(
-            max(canvas.winfo_width() // 2, 120),
-            max(canvas.winfo_height() // 2, 80),
-            text=text,
-            fill=TEXT_MUTED,
-            font=("Segoe UI", 14, "bold"),
-            justify="center",
+            left - 10,
+            y,
+            anchor="e",
+            text="0",
+            fill="#7D8797",
+            font=("Segoe UI", 10)
         )
+
+    # Línea plana en cero
+    zero_y = top + usable_h
+    canvas.create_line(
+        left,
+        zero_y,
+        left + usable_w,
+        zero_y,
+        fill=BLUE,
+        width=3
+    )
+
+    # Puntos vacíos de referencia
+    for i in range(6):
+        x = left + int((usable_w / 5) * i)
+        canvas.create_oval(
+            x - 4,
+            zero_y - 4,
+            x + 4,
+            zero_y + 4,
+            fill=BLUE,
+            outline=""
+        )
+
+    canvas.create_text(
+        left,
+        height - 18,
+        anchor="w",
+        text="Sin datos registrados todavía",
+        fill=TEXT_MUTED,
+        font=("Segoe UI", 11, "bold")
+    )
 
     def draw_horizontal_bar_chart(self, canvas, data, empty_text):
         canvas.delete("all")

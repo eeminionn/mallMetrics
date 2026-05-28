@@ -167,6 +167,7 @@ class RetailAnalyticsApp(BaseApp):
         self.analysis_frame_label = None
         self.analysis_people_label = None
         self.analysis_zone_label = None
+        self.analysis_results_button = None
         self.analysis_zones = []
 
         self.show_login()
@@ -947,30 +948,65 @@ class RetailAnalyticsApp(BaseApp):
         self.after(100, self.redraw_zone_canvas)
 
     def create_zone_type_button(self, parent, zone_type, title, description):
-        button = ctk.CTkButton(
+        # Usamos una tarjeta con labels en vez de un CTkButton multilinea.
+        # Así el texto no se corta ni se corre cuando cambia el tamaño del panel.
+        card = ctk.CTkFrame(
             parent,
-            text=f"{title}\n{description}",
-            height=76,
+            height=92,
             corner_radius=18,
-            font=("Segoe UI", 15, "bold"),
-            anchor="w",
             fg_color="#202838",
-            hover_color="#2A3448",
-            command=lambda: self.set_zone_current_type(zone_type),
         )
-        button.pack(fill="x", padx=22, pady=7)
-        self.zone_buttons[zone_type] = button
+        card.pack(fill="x", padx=22, pady=7)
+        card.pack_propagate(False)
+
+        title_label = ctk.CTkLabel(
+            card,
+            text=title,
+            font=("Segoe UI", 15, "bold"),
+            text_color=TEXT_MAIN,
+            anchor="w",
+            justify="left",
+        )
+        title_label.pack(fill="x", padx=22, pady=(18, 2))
+
+        desc_label = ctk.CTkLabel(
+            card,
+            text=description,
+            font=("Segoe UI", 13, "bold"),
+            text_color=TEXT_MAIN,
+            anchor="w",
+            justify="left",
+            wraplength=280,
+        )
+        desc_label.pack(fill="x", padx=22, pady=(0, 14))
+
+        def select_zone(event=None, selected_type=zone_type):
+            self.set_zone_current_type(selected_type)
+
+        card.bind("<Button-1>", select_zone)
+        title_label.bind("<Button-1>", select_zone)
+        desc_label.bind("<Button-1>", select_zone)
+
+        self.zone_buttons[zone_type] = {
+            "card": card,
+            "title": title_label,
+            "description": desc_label,
+        }
 
     def update_zone_type_buttons(self):
-        for zone_type, button in self.zone_buttons.items():
+        for zone_type, widgets in self.zone_buttons.items():
+            card = widgets["card"]
+            title_label = widgets["title"]
+            desc_label = widgets["description"]
+
             if zone_type == self.zone_current_type:
-                button.configure(
-                    fg_color=ZONE_STYLES[zone_type]["hex"],
-                    hover_color=ZONE_STYLES[zone_type]["hex"],
-                    text_color="#101010",
-                )
+                card.configure(fg_color=ZONE_STYLES[zone_type]["hex"])
+                title_label.configure(text_color="#101010")
+                desc_label.configure(text_color="#101010")
             else:
-                button.configure(fg_color="#202838", hover_color="#2A3448", text_color=TEXT_MAIN)
+                card.configure(fg_color="#202838")
+                title_label.configure(text_color=TEXT_MAIN)
+                desc_label.configure(text_color=TEXT_MAIN)
 
     def set_zone_current_type(self, zone_type):
         self.zone_current_type = zone_type
@@ -1288,7 +1324,20 @@ class RetailAnalyticsApp(BaseApp):
             hover_color="#333B4C",
             command=self.show_dashboard,
         )
-        dashboard_button.pack(fill="x", padx=22, pady=(0, 24))
+        dashboard_button.pack(fill="x", padx=22, pady=(0, 8))
+
+        self.analysis_results_button = ctk.CTkButton(
+            side_panel,
+            text="Ver gráficas",
+            height=46,
+            corner_radius=16,
+            font=("Segoe UI", 15, "bold"),
+            fg_color="#8E44AD",
+            hover_color="#7D3C98",
+            state="disabled",
+            command=self.show_results_view,
+        )
+        self.analysis_results_button.pack(fill="x", padx=22, pady=(0, 24))
 
         self.start_analysis_thread()
 
@@ -1476,6 +1525,9 @@ class RetailAnalyticsApp(BaseApp):
 
                     if self.analysis_people_label is not None:
                         self.analysis_people_label.configure(text=f"Personas únicas: {item.get('unique_people', 0)}")
+
+                    if self.analysis_results_button is not None:
+                        self.analysis_results_button.configure(state="normal")
 
                     print("\n===================================")
                     print("ANÁLISIS COMPLETADO")

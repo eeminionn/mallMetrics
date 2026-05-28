@@ -2,6 +2,7 @@ import os
 import threading
 import queue
 import csv
+import time
 import tkinter as tk
 from tkinter import messagebox, filedialog, simpledialog
 from pathlib import Path
@@ -71,6 +72,19 @@ def display_zone_label(zone):
 vision_utils.get_zone_label = display_zone_label
 
 
+# Parche de seguridad: si results_view.py aún no tiene go_back(),
+# lo agregamos desde aquí para evitar el error al abrir Ver gráficas.
+def _results_view_go_back(self):
+    if hasattr(self, "on_back") and self.on_back:
+        self.on_back()
+    else:
+        self.destroy()
+
+
+if not hasattr(ResultsView, "go_back"):
+    ResultsView.go_back = _results_view_go_back
+
+
 def save_zone_report(zones, zone_counts):
     with open(zone_report_file, "w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
@@ -118,12 +132,19 @@ class RetailAnalyticsApp(BaseApp):
         self.minsize(950, 620)
         self.configure(fg_color=APP_BG)
 
+        # El programa parte siempre en pantalla completa.
+        self.fullscreen = False
+
+        try:
+          self.after(100, lambda: self.state("zoomed"))
+        except Exception:
+           pass
+
         try:
             self.state("zoomed")
         except Exception:
             pass
 
-        self.fullscreen = False
         self.current_user = None
         self.current_role = None
         self.current_video_path = DEFAULT_VIDEO_PATH
@@ -157,6 +178,7 @@ class RetailAnalyticsApp(BaseApp):
         # Análisis
         self.analysis_queue = None
         self.analysis_stop_event = None
+        self.analysis_pause_event = None
         self.analysis_thread = None
         self.analysis_running = False
         self.analysis_canvas = None
@@ -167,6 +189,7 @@ class RetailAnalyticsApp(BaseApp):
         self.analysis_frame_label = None
         self.analysis_people_label = None
         self.analysis_zone_label = None
+        self.analysis_pause_button = None
         self.analysis_results_button = None
         self.analysis_zones = []
 
@@ -1235,6 +1258,7 @@ class RetailAnalyticsApp(BaseApp):
         self.analysis_running = False
         self.analysis_queue = queue.Queue()
         self.analysis_stop_event = threading.Event()
+        self.analysis_pause_event = threading.Event()
         self.analysis_current_frame = None
         self.analysis_zones = [zone.copy() for zone in zones]
 
@@ -1302,7 +1326,7 @@ class RetailAnalyticsApp(BaseApp):
         self.analysis_zone_label = ctk.CTkLabel(side_panel, text=f"Zonas configuradas: {len(zones)}", font=("Segoe UI", 14), text_color=TEXT_MAIN)
         self.analysis_zone_label.pack(anchor="w", padx=22, pady=6)
 
-        stop_button = ctk.CTkButton(
+        self.analysis_pause_button = ctk.CTkButton(
             side_panel,
             text="Detener análisis",
             height=46,
@@ -1310,9 +1334,9 @@ class RetailAnalyticsApp(BaseApp):
             font=("Segoe UI", 15, "bold"),
             fg_color="#4A2528",
             hover_color="#69343A",
-            command=self.stop_analysis_user,
+            command=self.toggle_analysis_pause,
         )
-        stop_button.pack(fill="x", padx=22, pady=(26, 8))
+        self.analysis_pause_button.pack(fill="x", padx=22, pady=(26, 8))
 
         dashboard_button = ctk.CTkButton(
             side_panel,
@@ -1384,6 +1408,13 @@ class RetailAnalyticsApp(BaseApp):
                     cap.release()
                     self.analysis_queue.put({"type": "stopped", "text": "Análisis detenido por el usuario."})
                     return
+
+                while self.analysis_pause_event is not None and self.analysis_pause_event.is_set():
+                    if self.analysis_stop_event.is_set():
+                        cap.release()
+                        self.analysis_queue.put({"type": "stopped", "text": "Análisis detenido por el usuario."})
+                        return
+                    time.sleep(0.1)
 
                 ret, frame = cap.read()
                 if not ret:
@@ -1526,6 +1557,14 @@ class RetailAnalyticsApp(BaseApp):
                     if self.analysis_people_label is not None:
                         self.analysis_people_label.configure(text=f"Personas únicas: {item.get('unique_people', 0)}")
 
+                    if self.analysis_pause_button is not None:
+                        self.analysis_pause_button.configure(
+                            text="Análisis completado",
+                            state="disabled",
+                            fg_color="#252B38",
+                            hover_color="#252B38",
+                        )
+
                     if self.analysis_results_button is not None:
                         self.analysis_results_button.configure(state="normal")
 
@@ -1587,12 +1626,36 @@ class RetailAnalyticsApp(BaseApp):
         self.analysis_canvas.delete("all")
         self.analysis_canvas.create_image(offset_x, offset_y, anchor="nw", image=self.analysis_photo)
 
-    def stop_analysis_user(self):
-        if self.analysis_stop_event is not None:
-            self.analysis_stop_event.set()
-        self.analysis_running = False
-        if self.analysis_status_label is not None:
-            self.analysis_status_label.configure(text="Deteniendo análisis...")
+    def toggle_analysis_pause(self):
+        if not self.analysis_running or self.analysis_pause_event is None:
+            return
+
+        if self.analysis_pause_event.is_set():
+            self.analysis_pause_event.clear()
+
+            if self.analysis_status_label is not None:
+                self.analysis_status_label.configure(text="Analizando video...")
+
+            if self.analysis_pause_button is not None:
+                self.analysis_pause_button.configure(
+                    text="Detener análisis",
+                    fg_color="#4A2528",
+                    hover_color="#69343A",
+                )
+        else:
+            self.analysis_pause_event.set()
+
+            if self.analysis_status_label is not None:
+                self.analysis_status_label.configure(
+                    text="Análisis pausado. Puedes reanudar cuando quieras."
+                )
+
+            if self.analysis_pause_button is not None:
+                self.analysis_pause_button.configure(
+                    text="Reanudar análisis",
+                    fg_color="#27AE60",
+                    hover_color="#219653",
+                )
 
 
 def main():

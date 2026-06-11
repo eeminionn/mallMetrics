@@ -33,14 +33,16 @@
       <h2>Filtrar tablero</h2>
       <span>{{ analyses|length }} analisis</span>
     </div>
-    <label for="categoryFilter">Categoria</label>
-    <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
-    <datalist id="categoryOptions">
-      {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
-    </datalist>
+    <div class="field-group">
+      <label for="categoryFilter">Categoria</label>
+      <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
+      <datalist id="categoryOptions">
+        {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
+      </datalist>
+    </div>
     <div class="tool-row single-row">
       <button class="primary-button" type="submit"><i data-lucide="filter"></i><span>Aplicar</span></button>
-      <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
+      <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
     </div>
   </form>
 </section>
@@ -60,7 +62,7 @@
               <span class="status-chip">{{ column.count }}</span>
               {% if column.id %}
                 <a class="ghost-button" href="{% url 'mall_detail' column.id %}"><i data-lucide="settings-2"></i><span>Editar</span></a>
-                <form method="post" action="{% url 'delete_mall' column.id %}" onsubmit="return confirm('Eliminar este mall? Los analisis quedaran sin mall asignado.');">
+                <form method="post" action="{% url 'delete_mall' column.id %}" data-confirm-title="Eliminar mall" data-confirm-message="Se eliminara {{ column.name }} y los analisis quedaran sin mall asignado." data-confirm-label="Eliminar mall">
                   {% csrf_token %}
                   <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
                 </form>
@@ -90,7 +92,7 @@
                 {% if item.status == "completed" %}
                   <a class="primary-button" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
                 {% endif %}
-                <form method="post" action="{% url 'delete_analysis' item.pk %}" onsubmit="return confirm('Eliminar este estudio y sus archivos generados?');">
+                <form method="post" action="{% url 'delete_analysis' item.pk %}" data-confirm-title="Eliminar analisis" data-confirm-message="Se eliminara {{ item.display_name }} y todos sus archivos generados." data-confirm-label="Eliminar analisis">
                   {% csrf_token %}
                     <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
                   </form>

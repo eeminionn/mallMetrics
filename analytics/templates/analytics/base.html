@@ -5,14 +5,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}mallMetrics{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <style>
+    body[data-tailwind-ready="false"] {
+      opacity: 0;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  {% include "analytics/includes/tailwind_theme.html" %}
   <link rel="stylesheet" href="{% static 'analytics/styles.css' %}">
 </head>
-<body>
+<body data-tailwind-ready="false">
   <div class="app-shell{% if not user.is_authenticated %} auth-shell{% endif %}">
     {% if user.is_authenticated %}
-      <aside class="sidebar">
+      <button id="sidebarBackdrop" class="sidebar-backdrop hidden lg:hidden" type="button" aria-label="Cerrar menu"></button>
+      <aside id="appSidebar" class="sidebar" data-open="false">
         <a class="brand" href="{% url 'dashboard' %}" aria-label="mallMetrics">
           <span class="brand-mark">mM</span>
           <span>
@@ -22,11 +33,11 @@
         </a>
 
         <nav class="nav">
-          <a href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resultados</span></a>
-          <a href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Mall's</span></a>
-          <a href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
-          <a href="{% url 'video_upload' %}"><i data-lucide="upload-cloud"></i><span>Nuevo analisis</span></a>
-          <a href="{% url 'reports' %}"><i data-lucide="table-2"></i><span>Reportes</span></a>
+          <a class="{% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'analysis_results' %}active{% endif %}" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resultados</span></a>
+          <a class="{% if request.resolver_match.url_name == 'mall_board' or request.resolver_match.url_name == 'mall_detail' %}active{% endif %}" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Mall's</span></a>
+          <a class="{% if request.resolver_match.url_name == 'analysis_list' or request.resolver_match.url_name == 'zone_editor' or request.resolver_match.url_name == 'analysis_status' %}active{% endif %}" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
+          <a class="{% if request.resolver_match.url_name == 'video_upload' %}active{% endif %}" href="{% url 'video_upload' %}"><i data-lucide="upload-cloud"></i><span>Nuevo analisis</span></a>
+          <a class="{% if request.resolver_match.url_name == 'reports' or request.resolver_match.url_name == 'reports_for_analysis' %}active{% endif %}" href="{% url 'reports' %}"><i data-lucide="table-2"></i><span>Reportes</span></a>
           <a href="{% url 'admin:index' %}"><i data-lucide="shield-check"></i><span>Admin</span></a>
         </nav>
 
@@ -44,6 +55,21 @@
     {% endif %}
 
     <main class="content">
+      {% if user.is_authenticated %}
+        <div class="mobile-shell-bar">
+          <div class="mobile-shell-title">
+            <span class="brand-mark">mM</span>
+            <span>
+              <strong>mallMetrics</strong>
+              <small>Retail Intelligence</small>
+            </span>
+          </div>
+          <button id="sidebarToggle" class="ghost-button" type="button" aria-label="Abrir menu">
+            <i data-lucide="panel-left-open"></i>
+            <span>Menu</span>
+          </button>
+        </div>
+      {% endif %}
       {% if messages %}
         <div class="messages">
           {% for message in messages %}
@@ -55,11 +81,86 @@
     </main>
   </div>
 
+  <dialog id="confirmDialog" class="confirm-modal">
+    <form method="dialog" class="confirm-modal-card">
+      <div class="confirm-modal-head">
+        <h2 id="confirmDialogTitle">Confirmar accion</h2>
+        <p id="confirmDialogDescription">Esta accion no se puede deshacer.</p>
+      </div>
+      <div class="confirm-modal-actions">
+        <button class="ghost-button" value="cancel" type="submit">Cancelar</button>
+        <button id="confirmDialogButton" class="danger-button" value="confirm" type="submit">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script>
     if (window.lucide) {
       lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
     }
+
+    const revealApp = () => {
+      document.body.dataset.tailwindReady = "true";
+    };
+    window.addEventListener("load", revealApp, { once: true });
+    window.setTimeout(revealApp, 900);
+
+    (() => {
+      const sidebar = document.getElementById("appSidebar");
+      const toggle = document.getElementById("sidebarToggle");
+      const backdrop = document.getElementById("sidebarBackdrop");
+      if (!sidebar || !toggle || !backdrop) return;
+
+      const setSidebarOpen = (isOpen) => {
+        sidebar.dataset.open = isOpen ? "true" : "false";
+        backdrop.classList.toggle("hidden", !isOpen);
+        document.body.style.overflow = isOpen ? "hidden" : "";
+      };
+
+      toggle.addEventListener("click", () => setSidebarOpen(true));
+      backdrop.addEventListener("click", () => setSidebarOpen(false));
+      sidebar.querySelectorAll("a").forEach((link) => {
+        link.addEventListener("click", () => setSidebarOpen(false));
+      });
+      window.addEventListener("resize", () => {
+        if (window.innerWidth >= 1024) {
+          setSidebarOpen(false);
+        }
+      });
+    })();
+
+    (() => {
+      const dialog = document.getElementById("confirmDialog");
+      const title = document.getElementById("confirmDialogTitle");
+      const description = document.getElementById("confirmDialogDescription");
+      const actionButton = document.getElementById("confirmDialogButton");
+      if (!dialog || typeof dialog.showModal !== "function") return;
+
+      let activeForm = null;
+      document.querySelectorAll("form[data-confirm-message]").forEach((form) => {
+        form.addEventListener("submit", (event) => {
+          if (form.dataset.confirmBypass === "true") {
+            form.dataset.confirmBypass = "false";
+            return;
+          }
+          event.preventDefault();
+          activeForm = form;
+          title.textContent = form.dataset.confirmTitle || "Confirmar accion";
+          description.textContent = form.dataset.confirmMessage || "Esta accion no se puede deshacer.";
+          actionButton.textContent = form.dataset.confirmLabel || "Confirmar";
+          dialog.showModal();
+        });
+      });
+
+      dialog.addEventListener("close", () => {
+        if (dialog.returnValue === "confirm" && activeForm) {
+          activeForm.dataset.confirmBypass = "true";
+          activeForm.submit();
+        }
+        activeForm = null;
+      });
+    })();
   </script>
   {% block scripts %}{% endblock %}
 </body>

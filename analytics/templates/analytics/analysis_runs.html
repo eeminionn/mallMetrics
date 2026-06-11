@@ -16,25 +16,33 @@
 </header>
 
 <form class="panel study-filter" method="get">
-  <label for="mallFilter">Mall</label>
-  <input id="mallFilter" name="mall" list="mallOptions" type="text" value="{{ selected_mall }}" placeholder="Todos los malls">
-  <datalist id="mallOptions">
-    {% for mall in mall_options %}<option value="{{ mall }}"></option>{% endfor %}
-  </datalist>
-  <label for="categoryFilter">Categoria</label>
-  <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
-  <datalist id="categoryOptions">
-    {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
-  </datalist>
-  <label for="statusFilter">Estado</label>
-  <select id="statusFilter" name="status" class="select-field">
-    <option value="">Todos los estados</option>
-    {% for value, label in status_options %}
-      <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
-  <button class="primary-button" type="submit"><i data-lucide="filter"></i><span>Filtrar</span></button>
-  <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
+  <div class="field-group">
+    <label for="mallFilter">Mall</label>
+    <input id="mallFilter" name="mall" list="mallOptions" type="text" value="{{ selected_mall }}" placeholder="Todos los malls">
+    <datalist id="mallOptions">
+      {% for mall in mall_options %}<option value="{{ mall }}"></option>{% endfor %}
+    </datalist>
+  </div>
+  <div class="field-group">
+    <label for="categoryFilter">Categoria</label>
+    <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
+    <datalist id="categoryOptions">
+      {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
+    </datalist>
+  </div>
+  <div class="field-group">
+    <label for="statusFilter">Estado</label>
+    <select id="statusFilter" name="status" class="select-field">
+      <option value="">Todos los estados</option>
+      {% for value, label in status_options %}
+        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-actions">
+    <button class="primary-button" type="submit"><i data-lucide="filter"></i><span>Filtrar</span></button>
+    <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
+  </div>
 </form>
 
 <section class="panel data-panel">
@@ -58,7 +66,7 @@
             {% if item.status == "completed" %}
               <a class="primary-button" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
             {% endif %}
-            <form method="post" action="{% url 'delete_analysis' item.pk %}" onsubmit="return confirm('Eliminar este analisis y sus archivos generados?');">
+            <form method="post" action="{% url 'delete_analysis' item.pk %}" data-confirm-title="Eliminar analisis" data-confirm-message="Se eliminara {{ item.display_name }} y todos sus archivos generados." data-confirm-label="Eliminar analisis">
               {% csrf_token %}
               <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
             </form>

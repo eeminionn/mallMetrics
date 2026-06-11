@@ -7,75 +7,169 @@
   <div>
     <span class="eyebrow">Pipeline</span>
     <h1>Estudios</h1>
-    <p>Gestiona centros comerciales, categorias, ejecuciones y resultados.</p>
+    <p>Organiza malls, arrastra estudios entre columnas y gestiona los analisis desde un mismo tablero.</p>
   </div>
   <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo estudio</span></a>
 </header>
 
-<form class="panel study-filter" method="get">
-  <label for="mallFilter">Mall</label>
-  <input id="mallFilter" name="mall" list="mallOptions" type="text" value="{{ selected_mall }}" placeholder="Todos los malls">
-  <datalist id="mallOptions">
-    {% for mall in mall_options %}<option value="{{ mall }}"></option>{% endfor %}
-  </datalist>
-  <label for="categoryFilter">Categoria</label>
-  <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
-  <datalist id="categoryOptions">
-    {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
-  </datalist>
-  <button class="primary-button" type="submit"><i data-lucide="filter"></i><span>Filtrar</span></button>
-  <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
-</form>
+<section class="study-toolbar">
+  <form class="panel add-mall-form" method="post" action="{% url 'create_mall' %}">
+    {% csrf_token %}
+    <div class="panel-title">
+      <h2>Agregar mall</h2>
+      <span>Sin crear estudio</span>
+    </div>
+    <label for="{{ mall_form.name.id_for_label }}">Nombre del mall</label>
+    {{ mall_form.name }}
+    <button class="primary-button" type="submit"><i data-lucide="building-2"></i><span>Crear mall</span></button>
+  </form>
 
-{% if analyses %}
-  <section class="study-groups">
-    {% for group in grouped_analyses %}
-      <article class="study-group">
-        <div class="group-heading">
-          <div>
-            <span class="eyebrow">Mall</span>
-            <h2>{{ group.mall }}</h2>
-          </div>
-          <span>{{ group.count }} estudios</span>
+  <form class="panel study-filter compact" method="get">
+    <div class="panel-title">
+      <h2>Filtrar tablero</h2>
+      <span>{{ analyses|length }} estudios</span>
+    </div>
+    <label for="categoryFilter">Categoria</label>
+    <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
+    <datalist id="categoryOptions">
+      {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
+    </datalist>
+    <div class="tool-row single-row">
+      <button class="primary-button" type="submit"><i data-lucide="filter"></i><span>Aplicar</span></button>
+      <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
+    </div>
+  </form>
+</section>
+
+<div id="boardCsrfTokenHolder" class="hidden">{% csrf_token %}</div>
+
+<section class="mall-board">
+  {% for column in board_columns %}
+    <article class="mall-column" data-mall-id="{{ column.id }}">
+      <div class="mall-column-head">
+        <div>
+          <span class="eyebrow">Mall</span>
+          <h2>{{ column.name }}</h2>
         </div>
+        <span class="status-chip">{{ column.count }}</span>
+      </div>
 
-        {% for category in group.categories %}
-          <div class="category-heading">
-            <h3>{{ category.name }}</h3>
-            <span>{{ category.count }}</span>
-          </div>
-          <div class="study-list">
-            {% for item in category.items %}
-              <article class="study-row">
+      <div class="mall-dropzone" data-mall-id="{{ column.id }}">
+        {% if column.items %}
+          {% for item in column.items %}
+            <article class="study-card" draggable="true" data-analysis-id="{{ item.pk }}">
+              <div class="study-card-head">
                 <div>
-                  <h2>{{ item.display_name }}</h2>
-                  <p>{{ item.grouping_label }} · {{ item.created_at|date:"d/m/Y H:i" }} · {{ item.total_frames }} frames · {{ item.frame_width }}x{{ item.frame_height }}</p>
+                  <h3>{{ item.display_name }}</h3>
+                  <p>{{ item.created_at|date:"d/m/Y H:i" }} · {{ item.total_frames }} frames · {{ item.frame_width }}x{{ item.frame_height }}</p>
                 </div>
                 <span class="status-chip status-{{ item.status }}">{{ item.get_status_display }}</span>
-                <div class="study-actions">
-                  <a class="ghost-button" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
-                  <a class="ghost-button" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
-                  <a class="ghost-button" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
-                  {% if item.status == "completed" %}
-                    <a class="primary-button" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
-                  {% endif %}
-                  <form method="post" action="{% url 'delete_analysis' item.pk %}" onsubmit="return confirm('Eliminar este estudio y sus archivos generados?');">
-                    {% csrf_token %}
-                    <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
-                  </form>
-                </div>
-              </article>
-            {% endfor %}
+              </div>
+              <div class="study-meta">
+                {% if item.category %}<span class="type-pill">{{ item.category }}</span>{% endif %}
+                {% if item.area %}<span class="type-pill">{{ item.area }}</span>{% endif %}
+              </div>
+              <div class="study-actions">
+                <a class="ghost-button" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+                <a class="ghost-button" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+                <a class="ghost-button" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
+                {% if item.status == "completed" %}
+                  <a class="primary-button" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
+                {% endif %}
+                <form method="post" action="{% url 'delete_analysis' item.pk %}" onsubmit="return confirm('Eliminar este estudio y sus archivos generados?');">
+                  {% csrf_token %}
+                  <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        {% else %}
+          <div class="mall-empty">
+            <i data-lucide="inbox"></i>
+            <span>Suelta estudios aqui</span>
           </div>
-        {% endfor %}
-      </article>
-    {% endfor %}
-  </section>
-{% else %}
-  <section class="empty-state large">
-    <i data-lucide="folder-plus"></i>
-    <span>No hay estudios creados</span>
-    <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Crear estudio</span></a>
-  </section>
-{% endif %}
+        {% endif %}
+      </div>
+    </article>
+  {% endfor %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (() => {
+    const token = document.querySelector("#boardCsrfTokenHolder input[name='csrfmiddlewaretoken']").value;
+    let draggingCard = null;
+
+    async function moveStudy(card, mallId) {
+      const response = await fetch(`/analyses/${card.dataset.analysisId}/move-mall/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": token
+        },
+        body: JSON.stringify({ mall_id: mallId })
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo mover el estudio.");
+      }
+      return response.json();
+    }
+
+    function refreshEmptyStates() {
+      document.querySelectorAll(".mall-dropzone").forEach(zone => {
+        const cards = zone.querySelectorAll(".study-card");
+        let empty = zone.querySelector(".mall-empty");
+        if (cards.length === 0 && !empty) {
+          empty = document.createElement("div");
+          empty.className = "mall-empty";
+          empty.innerHTML = '<i data-lucide="inbox"></i><span>Suelta estudios aqui</span>';
+          zone.appendChild(empty);
+          if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
+        } else if (cards.length > 0 && empty) {
+          empty.remove();
+        }
+        const chip = zone.closest(".mall-column").querySelector(".status-chip");
+        chip.textContent = String(cards.length);
+      });
+    }
+
+    document.querySelectorAll(".study-card").forEach(card => {
+      card.addEventListener("dragstart", () => {
+        draggingCard = card;
+        card.classList.add("dragging");
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("dragging");
+        draggingCard = null;
+      });
+    });
+
+    document.querySelectorAll(".mall-dropzone").forEach(zone => {
+      zone.addEventListener("dragover", event => {
+        event.preventDefault();
+        zone.classList.add("drag-over");
+      });
+      zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+      zone.addEventListener("drop", async event => {
+        event.preventDefault();
+        zone.classList.remove("drag-over");
+        if (!draggingCard) return;
+
+        const previousZone = draggingCard.parentElement;
+        zone.appendChild(draggingCard);
+        refreshEmptyStates();
+        try {
+          await moveStudy(draggingCard, zone.dataset.mallId);
+        } catch (error) {
+          previousZone.appendChild(draggingCard);
+          refreshEmptyStates();
+          window.alert(error.message);
+        }
+      });
+    });
+
+    refreshEmptyStates();
+  })();
+</script>
 {% endblock %}

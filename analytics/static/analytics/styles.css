@@ -688,40 +688,113 @@ input[list] {
   margin-bottom: 14px;
 }
 
+.study-filter.compact {
+  grid-template-columns: 1fr;
+  margin-bottom: 0;
+}
+
 .study-filter label {
   margin-bottom: 12px;
 }
 
-.study-groups {
+.study-toolbar {
   display: grid;
-  gap: 14px;
-}
-
-.study-group {
-  display: grid;
+  grid-template-columns: 340px minmax(260px, 380px);
   gap: 12px;
+  align-items: start;
+  margin-bottom: 14px;
 }
 
-.group-heading,
-.category-heading {
+.add-mall-form {
+  display: grid;
+  gap: 10px;
+}
+
+.mall-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(320px, 1fr);
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.mall-column {
+  min-height: 620px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(12, 18, 14, .96), rgba(8, 13, 10, .98));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.mall-column-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.group-heading {
-  padding: 14px 0 4px;
-  border-bottom: 1px solid var(--border);
-}
-
-.group-heading h2,
-.category-heading h3 {
+.mall-column-head h2,
+.study-card h3 {
   margin: 0;
 }
 
-.category-heading {
-  padding-top: 6px;
+.mall-dropzone {
+  min-height: 520px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px dashed transparent;
+  transition: border-color .18s ease, background-color .18s ease;
+}
+
+.mall-dropzone.drag-over {
+  border-color: #61ec9f;
+  background: rgba(50, 213, 131, .08);
+}
+
+.mall-empty {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--quiet);
+  text-align: center;
+}
+
+.study-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: #09100c;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: grab;
+}
+
+.study-card.dragging {
+  opacity: .55;
+}
+
+.study-card-head,
+.study-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.study-card p {
+  margin: 6px 0 0;
   color: var(--muted);
 }
 
@@ -761,7 +834,8 @@ input[list] {
   .form-layout,
   .zone-layout,
   .status-layout,
-  .analysis-grid {
+  .analysis-grid,
+  .study-toolbar {
     grid-template-columns: 1fr;
   }
 
@@ -772,6 +846,11 @@ input[list] {
   .kpi-grid,
   .workflow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mall-board {
+    grid-auto-flow: row;
+    grid-auto-columns: unset;
   }
 
   .study-filter {

@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import AnalysisRun
+from .models import AnalysisRun, Mall
 
 
 class VideoUploadForm(forms.ModelForm):
@@ -28,3 +28,13 @@ class VideoUploadForm(forms.ModelForm):
         if suffix not in allowed_extensions:
             raise forms.ValidationError("Formato de video no soportado.")
         return video
+
+
+class MallForm(forms.ModelForm):
+    class Meta:
+        model = Mall
+        fields = ["name"]
+        labels = {"name": "Nombre del mall"}
+        widgets = {
+            "name": forms.TextInput(attrs={"placeholder": "Ej: Mall Plaza Norte"}),
+        }

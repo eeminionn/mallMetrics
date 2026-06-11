@@ -28,7 +28,10 @@
     {{ form.name }}
     {{ form.name.errors }}
     <label for="{{ form.mall.id_for_label }}">Mall</label>
-    {{ form.mall }}
+    <input id="{{ form.mall.id_for_label }}" name="{{ form.mall.html_name }}" list="mallOptions" type="text" value="{{ form.mall.value|default:'' }}" placeholder="Ej: Mall Plaza Norte">
+    <datalist id="mallOptions">
+      {% for mall in mall_options %}<option value="{{ mall }}"></option>{% endfor %}
+    </datalist>
     {{ form.mall.errors }}
     <label for="{{ form.category.id_for_label }}">Categoria</label>
     {{ form.category }}

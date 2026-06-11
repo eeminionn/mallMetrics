@@ -1,6 +1,5 @@
 import json
 import threading
-from collections import OrderedDict
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -13,8 +12,8 @@ from django.views.decorators.http import require_POST
 from config import ZONE_STYLES
 
 from .analysis_engine import run_analysis_job
-from .forms import VideoUploadForm
-from .models import AnalysisRun
+from .forms import MallForm, VideoUploadForm
+from .models import AnalysisRun, Mall
 from .services import dashboard_context, prepare_video_metadata
 
 
@@ -93,24 +92,41 @@ def normalize_zones(raw_zones, frame_width, frame_height):
     return zones
 
 
-def group_analyses(analyses):
-    grouped = OrderedDict()
-    for analysis in analyses:
-        mall = analysis.mall.strip() or "Sin mall asignado"
-        category = analysis.category.strip() or "General"
-        grouped.setdefault(mall, OrderedDict())
-        grouped[mall].setdefault(category, [])
-        grouped[mall][category].append(analysis)
+def resolve_mall_group(name):
+    normalized = str(name or "").strip()
+    if not normalized:
+        return None
+    mall_group, _ = Mall.objects.get_or_create(name=normalized)
+    return mall_group
 
-    groups = []
-    for mall, categories in grouped.items():
-        category_groups = []
-        group_count = 0
-        for category, items in categories.items():
-            category_groups.append({"name": category, "items": items, "count": len(items)})
-            group_count += len(items)
-        groups.append({"mall": mall, "categories": category_groups, "count": group_count})
-    return groups
+
+def board_columns(analyses):
+    columns = []
+    all_malls = list(Mall.objects.all())
+    analyses_by_mall = {mall.id: [] for mall in all_malls}
+    unassigned = []
+
+    for analysis in analyses:
+        if analysis.mall_group_id and analysis.mall_group_id in analyses_by_mall:
+            analyses_by_mall[analysis.mall_group_id].append(analysis)
+        else:
+            unassigned.append(analysis)
+
+    for mall in all_malls:
+        columns.append({
+            "id": str(mall.id),
+            "name": mall.name,
+            "count": len(analyses_by_mall[mall.id]),
+            "items": analyses_by_mall[mall.id],
+        })
+
+    columns.append({
+        "id": "",
+        "name": "Sin mall asignado",
+        "count": len(unassigned),
+        "items": unassigned,
+    })
+    return columns
 
 
 @login_required
@@ -121,22 +137,17 @@ def dashboard(request):
 @login_required
 def analysis_list(request):
     analyses = AnalysisRun.objects.all()
-    selected_mall = request.GET.get("mall", "").strip()
     selected_category = request.GET.get("category", "").strip()
-    if selected_mall:
-        analyses = analyses.filter(mall=selected_mall)
     if selected_category:
         analyses = analyses.filter(category=selected_category)
 
-    mall_options = AnalysisRun.objects.exclude(mall="").order_by("mall").values_list("mall", flat=True).distinct()
     category_options = AnalysisRun.objects.exclude(category="").order_by("category").values_list("category", flat=True).distinct()
     return render(request, "analytics/analysis_list.html", {
         "analyses": analyses,
-        "grouped_analyses": group_analyses(analyses),
-        "mall_options": mall_options,
+        "board_columns": board_columns(analyses),
         "category_options": category_options,
-        "selected_mall": selected_mall,
         "selected_category": selected_category,
+        "mall_form": MallForm(),
     })
 
 
@@ -147,6 +158,8 @@ def video_upload(request):
         if form.is_valid():
             analysis = form.save(commit=False)
             analysis.created_by = request.user
+            analysis.mall_group = resolve_mall_group(form.cleaned_data.get("mall"))
+            analysis.mall = analysis.mall_group.name if analysis.mall_group else ""
             analysis.status_message = "Leyendo video"
             analysis.save()
             try:
@@ -158,7 +171,10 @@ def video_upload(request):
     else:
         form = VideoUploadForm()
 
-    return render(request, "analytics/video_upload.html", {"form": form})
+    return render(request, "analytics/video_upload.html", {
+        "form": form,
+        "mall_options": Mall.objects.values_list("name", flat=True),
+    })
 
 
 @login_required
@@ -244,6 +260,46 @@ def format_hms(seconds):
     minutes = (seconds % 3600) // 60
     remaining = seconds % 60
     return f"{hours:02d}:{minutes:02d}:{remaining:02d}"
+
+
+@login_required
+@require_POST
+def create_mall(request):
+    form = MallForm(request.POST)
+    if form.is_valid():
+        mall_group, created = Mall.objects.get_or_create(name=form.cleaned_data["name"].strip())
+        if created:
+            messages.success(request, f"Mall creado: {mall_group.name}")
+        else:
+            messages.error(request, f"El mall {mall_group.name} ya existe.")
+    else:
+        messages.error(request, "No se pudo crear el mall.")
+    return redirect("analysis_list")
+
+
+@login_required
+@require_POST
+def move_analysis_to_mall(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "JSON invalido."}, status=400)
+
+    mall_id = str(payload.get("mall_id", "")).strip()
+    mall_group = None
+    if mall_id:
+        mall_group = get_object_or_404(Mall, pk=mall_id)
+
+    analysis.mall_group = mall_group
+    analysis.mall = mall_group.name if mall_group else ""
+    analysis.save(update_fields=["mall_group", "mall", "updated_at"])
+    return JsonResponse({
+        "ok": True,
+        "analysis_id": str(analysis.pk),
+        "mall_id": str(mall_group.pk) if mall_group else "",
+        "mall_name": mall_group.name if mall_group else "",
+    })
 
 
 @login_required

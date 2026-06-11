@@ -7,6 +7,18 @@ from django.db import models
 from django.utils import timezone
 
 
+class Mall(models.Model):
+    name = models.CharField(max_length=140, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class AnalysisRun(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Borrador"
@@ -18,6 +30,13 @@ class AnalysisRun(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=160, blank=True)
+    mall_group = models.ForeignKey(
+        Mall,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="analyses",
+    )
     mall = models.CharField(max_length=140, blank=True, db_index=True)
     category = models.CharField(max_length=140, blank=True, db_index=True)
     area = models.CharField(max_length=140, blank=True)
@@ -78,8 +97,14 @@ class AnalysisRun(models.Model):
 
     @property
     def grouping_label(self):
-        parts = [self.mall, self.category, self.area]
+        parts = [self.mall_name, self.category, self.area]
         return " / ".join(part for part in parts if part) or "Sin clasificar"
+
+    @property
+    def mall_name(self):
+        if self.mall_group_id:
+            return self.mall_group.name
+        return self.mall
 
     def delete_artifacts(self):
         media_root = Path(settings.MEDIA_ROOT).resolve()

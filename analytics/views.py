@@ -116,6 +116,8 @@ def board_columns(analyses):
         columns.append({
             "id": str(mall.id),
             "name": mall.name,
+            "accent_color": mall.accent_color,
+            "notes": mall.notes,
             "count": len(analyses_by_mall[mall.id]),
             "items": analyses_by_mall[mall.id],
         })
@@ -123,6 +125,8 @@ def board_columns(analyses):
     columns.append({
         "id": "",
         "name": "Sin mall asignado",
+        "accent_color": "#5D6B62",
+        "notes": "",
         "count": len(unassigned),
         "items": unassigned,
     })
@@ -135,7 +139,7 @@ def dashboard(request):
 
 
 @login_required
-def analysis_list(request):
+def mall_board(request):
     analyses = AnalysisRun.objects.all()
     selected_category = request.GET.get("category", "").strip()
     if selected_category:
@@ -147,7 +151,31 @@ def analysis_list(request):
         "board_columns": board_columns(analyses),
         "category_options": category_options,
         "selected_category": selected_category,
-        "mall_form": MallForm(),
+        "mall_form": MallForm(initial={"accent_color": "#32D583"}),
+    })
+
+
+@login_required
+def analysis_list(request):
+    analyses = AnalysisRun.objects.select_related("mall_group").all()
+    selected_mall = request.GET.get("mall", "").strip()
+    selected_category = request.GET.get("category", "").strip()
+    selected_status = request.GET.get("status", "").strip()
+    if selected_mall:
+        analyses = analyses.filter(mall_group__name=selected_mall)
+    if selected_category:
+        analyses = analyses.filter(category=selected_category)
+    if selected_status:
+        analyses = analyses.filter(status=selected_status)
+
+    return render(request, "analytics/analysis_runs.html", {
+        "analyses": analyses,
+        "mall_options": Mall.objects.values_list("name", flat=True),
+        "category_options": AnalysisRun.objects.exclude(category="").order_by("category").values_list("category", flat=True).distinct(),
+        "status_options": AnalysisRun.Status.choices,
+        "selected_mall": selected_mall,
+        "selected_category": selected_category,
+        "selected_status": selected_status,
     })
 
 
@@ -269,12 +297,38 @@ def create_mall(request):
     if form.is_valid():
         mall_group, created = Mall.objects.get_or_create(name=form.cleaned_data["name"].strip())
         if created:
+            mall_group.accent_color = form.cleaned_data["accent_color"]
+            mall_group.notes = form.cleaned_data["notes"]
+            mall_group.save(update_fields=["accent_color", "notes", "updated_at"])
+        if created:
             messages.success(request, f"Mall creado: {mall_group.name}")
         else:
             messages.error(request, f"El mall {mall_group.name} ya existe.")
     else:
         messages.error(request, "No se pudo crear el mall.")
-    return redirect("analysis_list")
+    return redirect("mall_board")
+
+
+@login_required
+def mall_detail(request, pk):
+    mall = get_object_or_404(Mall, pk=pk)
+    if request.method == "POST":
+        form = MallForm(request.POST, instance=mall)
+        if form.is_valid():
+            form.save()
+            Mall.objects.filter(pk=mall.pk).update(updated_at=timezone.now())
+            AnalysisRun.objects.filter(mall_group=mall).update(mall=mall.name)
+            messages.success(request, f"Mall actualizado: {mall.name}")
+            return redirect("mall_board")
+    else:
+        form = MallForm(instance=mall)
+
+    analyses = mall.analyses.all()
+    return render(request, "analytics/mall_detail.html", {
+        "mall": mall,
+        "form": form,
+        "analyses": analyses,
+    })
 
 
 @login_required
@@ -355,11 +409,11 @@ def cancel_analysis(request, pk):
 def delete_analysis(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     if analysis.status == AnalysisRun.Status.RUNNING:
-        messages.error(request, "Cancela el analisis antes de eliminar el estudio.")
+        messages.error(request, "Cancela el analisis antes de eliminar el analisis.")
         return redirect("analysis_list")
 
     name = analysis.display_name
     analysis.delete_artifacts()
     analysis.delete()
-    messages.success(request, f"Estudio eliminado: {name}")
+    messages.success(request, f"Analisis eliminado: {name}")
     return redirect("analysis_list")

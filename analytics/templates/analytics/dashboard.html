@@ -3,23 +3,113 @@
 {% block title %}Resultados | mallMetrics{% endblock %}
 
 {% block content %}
-<header class="page-bar">
-  <div>
-    <span class="eyebrow">Panel analitico</span>
-    <h1>{% if analysis %}{{ analysis.display_name }}{% else %}Resultados{% endif %}</h1>
-    <p>{% if analysis %}Estado: {{ analysis.get_status_display }}{% else %}Crea un estudio para generar metricas de flujo.{% endif %}</p>
-  </div>
-  <div class="actions">
-    <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Estudios</span></a>
-    {% if analysis %}
+{% if dashboard_mode == "overview" %}
+  <header class="page-bar">
+    <div>
+      <span class="eyebrow">Resumen ejecutivo</span>
+      <h1>Resultados por mall</h1>
+      <p>Vista general para un analista: malls, ultimos analisis, densidad y actividad resumida.</p>
+    </div>
+    <div class="actions">
+      <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Mall's</span></a>
+      <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
+    </div>
+  </header>
+
+  {% if mall_cards %}
+    <section class="mall-summary-grid">
+      {% for card in mall_cards %}
+        <article class="mall-summary-card" style="--mall-accent: {{ card.mall.accent_color }};">
+          <div class="mall-summary-accent"></div>
+          <div class="mall-summary-body">
+            <div class="mall-summary-head">
+              <div>
+                <span class="eyebrow">Mall</span>
+                <h2>{{ card.mall.name }}</h2>
+                <p>{{ card.analysis_count }} analisis · {{ card.completed_count }} completados</p>
+              </div>
+              <div class="actions">
+                <a class="ghost-button" href="{% url 'mall_detail' card.mall.pk %}"><i data-lucide="settings-2"></i><span>Configurar</span></a>
+                <a class="primary-button" href="{% url 'mall_board' %}"><i data-lucide="move-right"></i><span>Ver en Mall's</span></a>
+              </div>
+            </div>
+
+            <div class="mall-summary-content">
+              <div class="mall-summary-preview">
+                {% if card.latest_snapshot and card.latest_snapshot.has_heatmap %}
+                  <img class="heatmap mall-thumb" src="{{ card.latest_snapshot.heatmap_url }}" alt="Mapa de calor de {{ card.mall.name }}">
+                {% else %}
+                  <div class="empty-state">
+                    <i data-lucide="map"></i>
+                    <span>Sin heatmap reciente</span>
+                  </div>
+                {% endif %}
+              </div>
+
+              <div class="mall-summary-metrics">
+                <div class="mini-kpi-grid">
+                  <article class="mini-kpi"><span>Personas</span><strong>{{ card.total_people }}</strong></article>
+                  <article class="mini-kpi"><span>Entradas zona</span><strong>{{ card.total_zone_entries }}</strong></article>
+                  <article class="mini-kpi"><span>Entradas tienda</span><strong>{{ card.total_store_entries }}</strong></article>
+                  <article class="mini-kpi"><span>Permanencia</span><strong>{{ card.avg_dwell_label }}</strong></article>
+                </div>
+
+                <div class="panel recent-analysis-list">
+                  <div class="panel-title">
+                    <h2>Analisis recientes</h2>
+                    <span>{{ card.recent_snapshots|length }}</span>
+                  </div>
+                  {% if card.recent_snapshots %}
+                    <div class="study-list">
+                      {% for snapshot in card.recent_snapshots %}
+                        <article class="study-row compact">
+                          <div>
+                            <h2>{{ snapshot.analysis.display_name }}</h2>
+                            <p>{{ snapshot.analysis.created_at|date:"d/m/Y H:i" }} · {{ snapshot.analysis.category|default:"General" }}</p>
+                          </div>
+                          <div class="study-actions">
+                            <a class="ghost-button" href="{% url 'analysis_status' snapshot.analysis.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+                            <a class="primary-button" href="{% url 'analysis_results' snapshot.analysis.pk %}"><i data-lucide="bar-chart-3"></i><span>Abrir</span></a>
+                          </div>
+                        </article>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="empty-state">
+                      <i data-lucide="file-search"></i>
+                      <span>Este mall aun no tiene analisis completados</span>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+  {% else %}
+    <section class="empty-dashboard">
+      <i data-lucide="building-2"></i>
+      <h2>No hay malls configurados todavia</h2>
+      <a class="primary-button" href="{% url 'mall_board' %}"><i data-lucide="plus"></i><span>Crear primer mall</span></a>
+    </section>
+  {% endif %}
+{% else %}
+  <header class="page-bar">
+    <div>
+      <span class="eyebrow">Panel analitico</span>
+      <h1>{{ analysis.display_name }}</h1>
+      <p>Estado: {{ analysis.get_status_display }}</p>
+    </div>
+    <div class="actions">
+      <a class="ghost-button" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resumen malls</span></a>
+      <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
       <a class="ghost-button" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Editar zonas</span></a>
       <a class="ghost-button" href="{% url 'analysis_status' analysis.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
-    {% endif %}
-    <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo estudio</span></a>
-  </div>
-</header>
+      <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
+    </div>
+  </header>
 
-{% if analysis %}
   <section class="kpi-grid">
     <article class="kpi kpi-blue">
       <span>Personas validadas</span>
@@ -116,17 +206,11 @@
       <div class="empty-state"><i data-lucide="table"></i><span>Sin registros de zona</span></div>
     {% endif %}
   </section>
-{% else %}
-  <section class="empty-dashboard">
-    <i data-lucide="file-video"></i>
-    <h2>No hay estudios todavia</h2>
-    <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Crear primer estudio</span></a>
-  </section>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
-{% if analysis %}
+{% if dashboard_mode == "analysis" %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
 <script>
   const chartData = {{ chart_payload|safe }};

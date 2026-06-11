@@ -1,15 +1,15 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Estudios | mallMetrics{% endblock %}
+{% block title %}Mall's | mallMetrics{% endblock %}
 
 {% block content %}
 <header class="page-bar">
   <div>
     <span class="eyebrow">Pipeline</span>
-    <h1>Estudios</h1>
-    <p>Organiza malls, arrastra estudios entre columnas y gestiona los analisis desde un mismo tablero.</p>
+    <h1>Mall's</h1>
+    <p>Gestiona malls, reorganiza analisis por contexto operativo y ajusta la estructura antes de entrar al detalle.</p>
   </div>
-  <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo estudio</span></a>
+  <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
 </header>
 
 <section class="study-toolbar">
@@ -17,17 +17,21 @@
     {% csrf_token %}
     <div class="panel-title">
       <h2>Agregar mall</h2>
-      <span>Sin crear estudio</span>
+      <span>Sin crear analisis</span>
     </div>
     <label for="{{ mall_form.name.id_for_label }}">Nombre del mall</label>
     {{ mall_form.name }}
+    <label for="{{ mall_form.accent_color.id_for_label }}">Color de organizacion</label>
+    {{ mall_form.accent_color }}
+    <label for="{{ mall_form.notes.id_for_label }}">Notas operativas</label>
+    {{ mall_form.notes }}
     <button class="primary-button" type="submit"><i data-lucide="building-2"></i><span>Crear mall</span></button>
   </form>
 
   <form class="panel study-filter compact" method="get">
     <div class="panel-title">
       <h2>Filtrar tablero</h2>
-      <span>{{ analyses|length }} estudios</span>
+      <span>{{ analyses|length }} analisis</span>
     </div>
     <label for="categoryFilter">Categoria</label>
     <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
@@ -45,14 +49,20 @@
 
 <section class="mall-board">
   {% for column in board_columns %}
-    <article class="mall-column" data-mall-id="{{ column.id }}">
-      <div class="mall-column-head">
-        <div>
-          <span class="eyebrow">Mall</span>
-          <h2>{{ column.name }}</h2>
-        </div>
-        <span class="status-chip">{{ column.count }}</span>
-      </div>
+        <article class="mall-column" data-mall-id="{{ column.id }}" style="--mall-accent: {{ column.accent_color }};">
+          <div class="mall-column-head">
+            <div>
+              <span class="eyebrow">Mall</span>
+              <h2>{{ column.name }}</h2>
+              {% if column.notes %}<p>{{ column.notes }}</p>{% endif %}
+            </div>
+            <div class="actions">
+              <span class="status-chip">{{ column.count }}</span>
+              {% if column.id %}
+                <a class="ghost-button" href="{% url 'mall_detail' column.id %}"><i data-lucide="settings-2"></i><span>Editar</span></a>
+              {% endif %}
+            </div>
+          </div>
 
       <div class="mall-dropzone" data-mall-id="{{ column.id }}">
         {% if column.items %}
@@ -78,15 +88,15 @@
                 {% endif %}
                 <form method="post" action="{% url 'delete_analysis' item.pk %}" onsubmit="return confirm('Eliminar este estudio y sus archivos generados?');">
                   {% csrf_token %}
-                  <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
-                </form>
-              </div>
-            </article>
+                    <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
+                  </form>
+                </div>
+              </article>
           {% endfor %}
         {% else %}
           <div class="mall-empty">
             <i data-lucide="inbox"></i>
-            <span>Suelta estudios aqui</span>
+            <span>Suelta analisis aqui</span>
           </div>
         {% endif %}
       </div>
@@ -111,7 +121,7 @@
         body: JSON.stringify({ mall_id: mallId })
       });
       if (!response.ok) {
-        throw new Error("No se pudo mover el estudio.");
+        throw new Error("No se pudo mover el analisis.");
       }
       return response.json();
     }
@@ -123,7 +133,7 @@
         if (cards.length === 0 && !empty) {
           empty = document.createElement("div");
           empty.className = "mall-empty";
-          empty.innerHTML = '<i data-lucide="inbox"></i><span>Suelta estudios aqui</span>';
+          empty.innerHTML = '<i data-lucide="inbox"></i><span>Suelta analisis aqui</span>';
           zone.appendChild(empty);
           if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
         } else if (cards.length > 0 && empty) {

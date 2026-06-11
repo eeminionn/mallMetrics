@@ -5,7 +5,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.files.base import ContentFile
 
-from .models import AnalysisRun
+from .models import AnalysisRun, Mall
 
 
 REPORT_FILES = {
@@ -232,7 +232,66 @@ def latest_relevant_analysis():
     return AnalysisRun.objects.first()
 
 
+def analysis_summary_snapshot(analysis):
+    ensure_results_database(analysis)
+    summary_rows = read_csv_dicts(REPORT_FILES["summary"], analysis)
+    summary = summary_rows[0] if summary_rows else {}
+    heatmap_path = report_path(REPORT_FILES["heatmap"], analysis)
+    return {
+        "analysis": analysis,
+        "summary": summary,
+        "has_heatmap": heatmap_path.exists(),
+        "heatmap_url": f"{analysis.report_media_prefix}{REPORT_FILES['heatmap']}" if heatmap_path.exists() else "",
+        "total_people": safe_int(summary.get("total_people")),
+        "zone_entries": safe_int(summary.get("total_zone_entries")),
+        "store_entries": safe_int(summary.get("total_store_entries")),
+        "avg_dwell_seconds": safe_float(summary.get("avg_dwell_time_seconds")),
+        "avg_dwell_label": summary.get("avg_dwell_time", "-"),
+    }
+
+
+def mall_overview_cards():
+    cards = []
+    malls = list(Mall.objects.all())
+    for mall in malls:
+        analyses = list(mall.analyses.order_by("-created_at"))
+        completed = [analysis for analysis in analyses if analysis.status == AnalysisRun.Status.COMPLETED]
+        snapshots = [analysis_summary_snapshot(analysis) for analysis in completed[:6]]
+        latest_snapshot = snapshots[0] if snapshots else None
+
+        total_people = sum(snapshot["total_people"] for snapshot in snapshots)
+        total_zone_entries = sum(snapshot["zone_entries"] for snapshot in snapshots)
+        total_store_entries = sum(snapshot["store_entries"] for snapshot in snapshots)
+        dwell_values = [snapshot["avg_dwell_seconds"] for snapshot in snapshots if snapshot["avg_dwell_seconds"] > 0]
+        avg_dwell_seconds = sum(dwell_values) / len(dwell_values) if dwell_values else 0
+        hours = int(avg_dwell_seconds) // 3600
+        minutes = (int(avg_dwell_seconds) % 3600) // 60
+        seconds = int(avg_dwell_seconds) % 60
+        avg_dwell_label = f"{hours:02d}:{minutes:02d}:{seconds:02d}" if dwell_values else "-"
+
+        cards.append({
+            "mall": mall,
+            "analysis_count": len(analyses),
+            "completed_count": len(completed),
+            "latest_snapshot": latest_snapshot,
+            "recent_snapshots": snapshots[:3],
+            "total_people": total_people,
+            "total_zone_entries": total_zone_entries,
+            "total_store_entries": total_store_entries,
+            "avg_dwell_label": avg_dwell_label,
+        })
+    return cards
+
+
 def dashboard_context(analysis=None):
+    if analysis is None:
+        mall_cards = mall_overview_cards()
+        return {
+            "dashboard_mode": "overview",
+            "mall_cards": mall_cards,
+            "analysis": None,
+        }
+
     if analysis is None:
         analysis = latest_relevant_analysis()
 
@@ -258,6 +317,7 @@ def dashboard_context(analysis=None):
     }
 
     return {
+        "dashboard_mode": "analysis",
         "analysis": analysis,
         "analyses": AnalysisRun.objects.all()[:12],
         "summary": summary,

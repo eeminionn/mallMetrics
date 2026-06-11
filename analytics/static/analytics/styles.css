@@ -450,6 +450,22 @@ input[list] {
   color: var(--text);
 }
 
+textarea,
+select {
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 12px;
+  border: 1px solid #2f4a3a;
+  border-radius: 8px;
+  background: #070b08;
+  color: var(--text);
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
 .form-error,
 .errorlist {
   color: #ffd1d1;
@@ -710,6 +726,10 @@ input[list] {
   gap: 10px;
 }
 
+.add-mall-form .tool-row {
+  margin: 0;
+}
+
 .mall-board {
   display: grid;
   grid-auto-flow: column;
@@ -727,6 +747,7 @@ input[list] {
   padding: 16px;
   background: linear-gradient(180deg, rgba(12, 18, 14, .96), rgba(8, 13, 10, .98));
   border: 1px solid var(--border);
+  border-left: 8px solid var(--mall-accent, var(--blue));
   border-radius: 8px;
   box-shadow: var(--shadow);
 }
@@ -741,6 +762,12 @@ input[list] {
 .mall-column-head h2,
 .study-card h3 {
   margin: 0;
+}
+
+.mall-column-head p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .mall-dropzone {
@@ -798,6 +825,107 @@ input[list] {
   color: var(--muted);
 }
 
+.compact {
+  align-items: start;
+}
+
+.compact .study-actions {
+  justify-content: flex-start;
+}
+
+.mall-summary-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.mall-summary-card {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  background: linear-gradient(180deg, rgba(12, 18, 14, .98), rgba(8, 13, 10, .98));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.mall-summary-accent {
+  background: var(--mall-accent, var(--blue));
+}
+
+.mall-summary-body {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.mall-summary-head,
+.mall-summary-content {
+  display: grid;
+  gap: 14px;
+}
+
+.mall-summary-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.mall-summary-head h2 {
+  margin: 0;
+}
+
+.mall-summary-head p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.mall-summary-content {
+  grid-template-columns: minmax(280px, .95fr) minmax(0, 1.15fr);
+}
+
+.mall-thumb {
+  min-height: 280px;
+  max-height: 360px;
+}
+
+.mall-summary-metrics {
+  display: grid;
+  gap: 12px;
+}
+
+.mini-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mini-kpi {
+  padding: 14px;
+  background: #09100c;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mini-kpi span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mini-kpi strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+}
+
+.recent-analysis-list {
+  padding: 14px;
+}
+
+.select-field {
+  min-height: 44px;
+}
+
 .study-list {
   display: grid;
   gap: 10px;
@@ -835,7 +963,9 @@ input[list] {
   .zone-layout,
   .status-layout,
   .analysis-grid,
-  .study-toolbar {
+  .study-toolbar,
+  .mall-summary-content,
+  .mall-summary-head {
     grid-template-columns: 1fr;
   }
 
@@ -869,6 +999,10 @@ input[list] {
   .kpi-grid,
   .workflow,
   .study-filter { grid-template-columns: 1fr; }
+
+  .mini-kpi-grid {
+    grid-template-columns: 1fr;
+  }
 
   .login-view {
     min-height: auto;

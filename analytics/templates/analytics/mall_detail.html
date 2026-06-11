@@ -1,0 +1,55 @@
+{% extends "analytics/base.html" %}
+
+{% block title %}Configurar Mall | mallMetrics{% endblock %}
+
+{% block content %}
+<header class="page-bar">
+  <div>
+    <span class="eyebrow">Configuracion</span>
+    <h1>{{ mall.name }}</h1>
+    <p>Personaliza identidad, color de organizacion y contexto operativo del mall.</p>
+  </div>
+  <div class="actions">
+    <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="arrow-left"></i><span>Volver a Mall's</span></a>
+  </div>
+</header>
+
+<section class="form-layout">
+  <form class="panel upload-panel" method="post">
+    {% csrf_token %}
+    <div class="panel-title"><h2>Identidad del mall</h2></div>
+    <label for="{{ form.name.id_for_label }}">Nombre</label>
+    {{ form.name }}
+    {{ form.name.errors }}
+    <label for="{{ form.accent_color.id_for_label }}">Color</label>
+    {{ form.accent_color }}
+    {{ form.accent_color.errors }}
+    <label for="{{ form.notes.id_for_label }}">Notas operativas</label>
+    {{ form.notes }}
+    {{ form.notes.errors }}
+    <button class="primary-button" type="submit"><i data-lucide="save"></i><span>Guardar cambios</span></button>
+  </form>
+
+  <aside class="panel checklist">
+    <div class="panel-title"><h2>Analisis vinculados</h2><span>{{ analyses|length }}</span></div>
+    {% if analyses %}
+      <div class="study-list">
+        {% for item in analyses|slice:":6" %}
+          <article class="study-row compact">
+            <div>
+              <h2>{{ item.display_name }}</h2>
+              <p>{{ item.category|default:"General" }} · {{ item.area|default:"Sin sector" }}</p>
+            </div>
+            <a class="ghost-button" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>Abrir</span></a>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <i data-lucide="folder-open"></i>
+        <span>Sin analisis asociados</span>
+      </div>
+    {% endif %}
+  </aside>
+</section>
+{% endblock %}

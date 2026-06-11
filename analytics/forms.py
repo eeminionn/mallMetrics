@@ -8,7 +8,7 @@ class VideoUploadForm(forms.ModelForm):
         model = AnalysisRun
         fields = ["name", "mall", "category", "area", "video"]
         labels = {
-            "name": "Nombre del estudio",
+            "name": "Nombre del analisis",
             "mall": "Mall",
             "category": "Categoria",
             "area": "Zona o sector",
@@ -33,8 +33,14 @@ class VideoUploadForm(forms.ModelForm):
 class MallForm(forms.ModelForm):
     class Meta:
         model = Mall
-        fields = ["name"]
-        labels = {"name": "Nombre del mall"}
+        fields = ["name", "accent_color", "notes"]
+        labels = {
+            "name": "Nombre del mall",
+            "accent_color": "Color de organizacion",
+            "notes": "Notas operativas",
+        }
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Ej: Mall Plaza Norte"}),
+            "accent_color": forms.TextInput(attrs={"type": "color"}),
+            "notes": forms.Textarea(attrs={"rows": 4, "placeholder": "Ej: foco en food court, piso 2 y acceso oriente"}),
         }

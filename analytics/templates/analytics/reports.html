@@ -6,10 +6,10 @@
 <header class="page-bar">
   <div>
     <span class="eyebrow">Auditoria</span>
-    <h1>Archivos del estudio</h1>
-    <p>{% if analysis %}{{ analysis.display_name }}{% else %}Ultimo estudio disponible{% endif %}</p>
+    <h1>Archivos del analisis</h1>
+    <p>{% if analysis %}{{ analysis.display_name }}{% else %}Ultimo analisis disponible{% endif %}</p>
   </div>
-  <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Estudios</span></a>
+  <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
 </header>
 
 <section class="panel data-panel">

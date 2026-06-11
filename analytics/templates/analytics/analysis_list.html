@@ -60,6 +60,10 @@
               <span class="status-chip">{{ column.count }}</span>
               {% if column.id %}
                 <a class="ghost-button" href="{% url 'mall_detail' column.id %}"><i data-lucide="settings-2"></i><span>Editar</span></a>
+                <form method="post" action="{% url 'delete_mall' column.id %}" onsubmit="return confirm('Eliminar este mall? Los analisis quedaran sin mall asignado.');">
+                  {% csrf_token %}
+                  <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
+                </form>
               {% endif %}
             </div>
           </div>

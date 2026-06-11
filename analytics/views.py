@@ -358,6 +358,18 @@ def move_analysis_to_mall(request, pk):
 
 @login_required
 @require_POST
+def delete_mall(request, pk):
+    mall = get_object_or_404(Mall, pk=pk)
+    linked_analyses = AnalysisRun.objects.filter(mall_group=mall)
+    linked_analyses.update(mall_group=None, mall="", updated_at=timezone.now())
+    mall_name = mall.name
+    mall.delete()
+    messages.success(request, f"Mall eliminado: {mall_name}. Sus analisis quedaron sin mall asignado.")
+    return redirect("mall_board")
+
+
+@login_required
+@require_POST
 def start_analysis(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     if analysis.status == AnalysisRun.Status.RUNNING:

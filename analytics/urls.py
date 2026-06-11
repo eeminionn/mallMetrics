@@ -10,6 +10,7 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("malls/", views.mall_board, name="mall_board"),
     path("malls/<int:pk>/", views.mall_detail, name="mall_detail"),
+    path("malls/<int:pk>/delete/", views.delete_mall, name="delete_mall"),
     path("analyses/", views.analysis_list, name="analysis_list"),
     path("malls/create/", views.create_mall, name="create_mall"),
     path("analyses/new/", views.video_upload, name="video_upload"),

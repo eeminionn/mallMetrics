@@ -58,6 +58,10 @@
             {% if item.status == "completed" %}
               <a class="primary-button" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
             {% endif %}
+            <form method="post" action="{% url 'delete_analysis' item.pk %}" onsubmit="return confirm('Eliminar este analisis y sus archivos generados?');">
+              {% csrf_token %}
+              <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
+            </form>
           </div>
         </article>
       {% endfor %}

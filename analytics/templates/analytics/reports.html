@@ -6,7 +6,7 @@
 <header class="page-bar">
   <div>
     <span class="eyebrow">Auditoria</span>
-    <h1>Reportes CSV</h1>
+    <h1>Archivos del estudio</h1>
     <p>{% if analysis %}{{ analysis.display_name }}{% else %}Ultimo estudio disponible{% endif %}</p>
   </div>
   <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Estudios</span></a>
@@ -24,7 +24,13 @@
         {% for report in report_files %}
           <tr>
             <td>{{ report.name }}</td>
-            <td>{{ report.filename }}</td>
+            <td>
+              {% if report.url %}
+                <a href="{{ report.url }}">{{ report.filename }}</a>
+              {% else %}
+                {{ report.filename }}
+              {% endif %}
+            </td>
             <td>{% if report.exists %}<span class="ok">Disponible</span>{% else %}<span class="missing">Pendiente</span>{% endif %}</td>
           </tr>
         {% endfor %}

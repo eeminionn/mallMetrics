@@ -7,37 +7,75 @@
   <div>
     <span class="eyebrow">Pipeline</span>
     <h1>Estudios</h1>
-    <p>Gestiona videos, zonas, ejecuciones y resultados.</p>
+    <p>Gestiona centros comerciales, categorias, ejecuciones y resultados.</p>
   </div>
   <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo estudio</span></a>
 </header>
 
-<section class="panel data-panel">
-  {% if analyses %}
-    <div class="study-list">
-      {% for item in analyses %}
-        <article class="study-row">
+<form class="panel study-filter" method="get">
+  <label for="mallFilter">Mall</label>
+  <input id="mallFilter" name="mall" list="mallOptions" type="text" value="{{ selected_mall }}" placeholder="Todos los malls">
+  <datalist id="mallOptions">
+    {% for mall in mall_options %}<option value="{{ mall }}"></option>{% endfor %}
+  </datalist>
+  <label for="categoryFilter">Categoria</label>
+  <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
+  <datalist id="categoryOptions">
+    {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
+  </datalist>
+  <button class="primary-button" type="submit"><i data-lucide="filter"></i><span>Filtrar</span></button>
+  <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
+</form>
+
+{% if analyses %}
+  <section class="study-groups">
+    {% for group in grouped_analyses %}
+      <article class="study-group">
+        <div class="group-heading">
           <div>
-            <h2>{{ item.display_name }}</h2>
-            <p>{{ item.created_at|date:"d/m/Y H:i" }} · {{ item.total_frames }} frames · {{ item.frame_width }}x{{ item.frame_height }}</p>
+            <span class="eyebrow">Mall</span>
+            <h2>{{ group.mall }}</h2>
           </div>
-          <span class="status-chip status-{{ item.status }}">{{ item.get_status_display }}</span>
-          <div class="study-actions">
-            <a class="ghost-button" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
-            <a class="ghost-button" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
-            {% if item.status == "completed" %}
-              <a class="primary-button" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
-            {% endif %}
+          <span>{{ group.count }} estudios</span>
+        </div>
+
+        {% for category in group.categories %}
+          <div class="category-heading">
+            <h3>{{ category.name }}</h3>
+            <span>{{ category.count }}</span>
           </div>
-        </article>
-      {% endfor %}
-    </div>
-  {% else %}
-    <div class="empty-state large">
-      <i data-lucide="folder-plus"></i>
-      <span>No hay estudios creados</span>
-      <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Crear estudio</span></a>
-    </div>
-  {% endif %}
-</section>
+          <div class="study-list">
+            {% for item in category.items %}
+              <article class="study-row">
+                <div>
+                  <h2>{{ item.display_name }}</h2>
+                  <p>{{ item.grouping_label }} · {{ item.created_at|date:"d/m/Y H:i" }} · {{ item.total_frames }} frames · {{ item.frame_width }}x{{ item.frame_height }}</p>
+                </div>
+                <span class="status-chip status-{{ item.status }}">{{ item.get_status_display }}</span>
+                <div class="study-actions">
+                  <a class="ghost-button" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+                  <a class="ghost-button" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+                  <a class="ghost-button" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
+                  {% if item.status == "completed" %}
+                    <a class="primary-button" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
+                  {% endif %}
+                  <form method="post" action="{% url 'delete_analysis' item.pk %}" onsubmit="return confirm('Eliminar este estudio y sus archivos generados?');">
+                    {% csrf_token %}
+                    <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
+                  </form>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </article>
+    {% endfor %}
+  </section>
+{% else %}
+  <section class="empty-state large">
+    <i data-lucide="folder-plus"></i>
+    <span>No hay estudios creados</span>
+    <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Crear estudio</span></a>
+  </section>
+{% endif %}
 {% endblock %}

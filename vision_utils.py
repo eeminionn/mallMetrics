@@ -26,12 +26,8 @@ def load_existing_zones(frame_width, frame_height):
         valid_zones = []
 
         for zone in zones:
-            if all(key in zone for key in ["id", "type", "x1", "y1", "x2", "y2"]):
-                zone["x1"] = int(np.clip(zone["x1"], 0, frame_width - 1))
-                zone["x2"] = int(np.clip(zone["x2"], 0, frame_width - 1))
-                zone["y1"] = int(np.clip(zone["y1"], 0, frame_height - 1))
-                zone["y2"] = int(np.clip(zone["y2"], 0, frame_height - 1))
-                valid_zones.append(zone)
+            if "id" in zone and "type" in zone:
+                valid_zones.append(normalize_zone_geometry(zone, frame_width, frame_height))
 
         return valid_zones
 
@@ -60,11 +56,56 @@ def get_zone_label(zone):
     return f"{base_label} {zone['id']}"
 
 
+def rectangle_points(zone):
+    x1, y1 = int(zone.get("x1", 0)), int(zone.get("y1", 0))
+    x2, y2 = int(zone.get("x2", 0)), int(zone.get("y2", 0))
+    left, right = sorted([x1, x2])
+    top, bottom = sorted([y1, y2])
+    return [
+        {"x": left, "y": top},
+        {"x": right, "y": top},
+        {"x": right, "y": bottom},
+        {"x": left, "y": bottom},
+    ]
+
+
+def zone_points(zone):
+    raw_points = zone.get("points")
+    if isinstance(raw_points, list) and len(raw_points) >= 4:
+        try:
+            return [(int(point["x"]), int(point["y"])) for point in raw_points[:4]]
+        except (KeyError, TypeError, ValueError):
+            return [(point["x"], point["y"]) for point in rectangle_points(zone)]
+    return [(point["x"], point["y"]) for point in rectangle_points(zone)]
+
+
+def normalize_zone_geometry(zone, frame_width, frame_height):
+    points = []
+    for x, y in zone_points(zone):
+        points.append({
+            "x": int(np.clip(x, 0, frame_width - 1)),
+            "y": int(np.clip(y, 0, frame_height - 1)),
+        })
+
+    xs = [point["x"] for point in points]
+    ys = [point["y"] for point in points]
+    zone["points"] = points
+    zone["x1"] = min(xs)
+    zone["y1"] = min(ys)
+    zone["x2"] = max(xs)
+    zone["y2"] = max(ys)
+    return zone
+
+
+def zone_polygon(zone):
+    return np.array(zone_points(zone), dtype=np.int32)
+
+
 def point_inside_zone(x, y, zone):
-    return (
-        zone["x1"] <= x <= zone["x2"] and
-        zone["y1"] <= y <= zone["y2"]
-    )
+    polygon = zone_polygon(zone)
+    if len(polygon) < 3:
+        return False
+    return cv2.pointPolygonTest(polygon, (float(x), float(y)), False) >= 0
 
 
 def draw_zones_on_frame(frame, zones, zone_counts=None, alpha=0.12):
@@ -75,37 +116,26 @@ def draw_zones_on_frame(frame, zones, zone_counts=None, alpha=0.12):
 
     for zone in zones:
         color = ZONE_STYLES.get(zone["type"], {"bgr": (255, 255, 255)})["bgr"]
-        x1, y1, x2, y2 = zone["x1"], zone["y1"], zone["x2"], zone["y2"]
-
-        cv2.rectangle(
-            overlay,
-            (x1, y1),
-            (x2, y2),
-            color,
-            -1
-        )
+        polygon = zone_polygon(zone)
+        cv2.fillPoly(overlay, [polygon], color)
 
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
     for zone in zones:
         color = ZONE_STYLES.get(zone["type"], {"bgr": (255, 255, 255)})["bgr"]
-        x1, y1, x2, y2 = zone["x1"], zone["y1"], zone["x2"], zone["y2"]
+        polygon = zone_polygon(zone)
+        min_x = int(np.min(polygon[:, 0]))
+        min_y = int(np.min(polygon[:, 1]))
 
         entries = zone_counts.get(zone["id"], 0)
         label = f"{get_zone_label(zone)} | entradas: {entries}"
 
-        cv2.rectangle(
-            frame,
-            (x1, y1),
-            (x2, y2),
-            color,
-            2
-        )
+        cv2.polylines(frame, [polygon], True, color, 2)
 
         cv2.putText(
             frame,
             label,
-            (x1, max(y1 - 8, 22)),
+            (min_x, max(min_y - 8, 22)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.55,
             color,
@@ -122,6 +152,7 @@ def save_zone_report(zones, zone_counts):
         writer.writerow([
             "zone_id",
             "zone_type",
+            "points_json",
             "x1",
             "y1",
             "x2",
@@ -133,6 +164,7 @@ def save_zone_report(zones, zone_counts):
             writer.writerow([
                 zone["id"],
                 zone["type"],
+                json.dumps(zone_points(zone), ensure_ascii=False),
                 zone["x1"],
                 zone["y1"],
                 zone["x2"],

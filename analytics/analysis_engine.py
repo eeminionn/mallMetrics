@@ -1,5 +1,7 @@
 import csv
 import json
+import re
+import sqlite3
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -30,6 +32,7 @@ dwell_times_file = "dwell_times.csv"
 time_bins_file = "time_bins.csv"
 stair_metrics_file = "stair_metrics.csv"
 zones_config_file = "zonas_configuradas.json"
+analytics_database_file = "analysis_results.sqlite3"
 
 tracking_confidence = max(float(confidence), 0.40)
 min_confirmed_frames = 8
@@ -85,6 +88,150 @@ def write_csv_file(path, fieldnames, rows):
             writer.writerow({field: row.get(field, "") for field in fieldnames})
 
 
+def sqlite_table_name(filename):
+    stem = re.sub(r"[^0-9a-zA-Z_]+", "_", Path(filename).stem).strip("_").lower()
+    if not stem:
+        stem = "table"
+    if stem[0].isdigit():
+        stem = f"t_{stem}"
+    return stem
+
+
+def import_csv_to_sqlite(connection, csv_path, table_name):
+    if not csv_path.exists():
+        return 0
+
+    with csv_path.open("r", encoding="utf-8", newline="") as file:
+        reader = csv.DictReader(file)
+        fields = reader.fieldnames or []
+        if not fields:
+            return 0
+        quoted_fields = ", ".join(f'"{field}" TEXT' for field in fields)
+        connection.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+        connection.execute(f'CREATE TABLE "{table_name}" ({quoted_fields})')
+
+        placeholders = ", ".join("?" for _ in fields)
+        quoted_names = ", ".join(f'"{field}"' for field in fields)
+        rows = [[row.get(field, "") for field in fields] for row in reader]
+        if rows:
+            connection.executemany(
+                f'INSERT INTO "{table_name}" ({quoted_names}) VALUES ({placeholders})',
+                rows,
+            )
+        return len(rows)
+
+
+def build_results_database(output_dir, analysis_id, video_path, zones):
+    output_dir = Path(output_dir)
+    database_path = output_dir / analytics_database_file
+    if database_path.exists():
+        database_path.unlink()
+
+    csv_files = [
+        analytics_summary_file,
+        person_tracks_file,
+        zone_events_file,
+        zone_metrics_file,
+        store_metrics_file,
+        dwell_times_file,
+        time_bins_file,
+        stair_metrics_file,
+        zone_report_file,
+    ]
+    asset_files = [heatmap_output_file, zones_config_file]
+
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("""
+            CREATE TABLE manifest (
+                name TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                exists_on_disk INTEGER NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                imported_table TEXT NOT NULL,
+                row_count INTEGER NOT NULL
+            )
+        """)
+        connection.execute("""
+            CREATE TABLE study (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+        connection.executemany(
+            "INSERT INTO study (key, value) VALUES (?, ?)",
+            [
+                ("analysis_id", str(analysis_id)),
+                ("video_path", str(video_path)),
+                ("heatmap_file", heatmap_output_file),
+            ],
+        )
+        connection.execute("""
+            CREATE TABLE zones_geometry (
+                zone_id TEXT PRIMARY KEY,
+                zone_name TEXT NOT NULL,
+                zone_type TEXT NOT NULL,
+                points_json TEXT NOT NULL,
+                x1 INTEGER NOT NULL,
+                y1 INTEGER NOT NULL,
+                x2 INTEGER NOT NULL,
+                y2 INTEGER NOT NULL
+            )
+        """)
+        connection.executemany(
+            """
+            INSERT INTO zones_geometry
+            (zone_id, zone_name, zone_type, points_json, x1, y1, x2, y2)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    zone["id"],
+                    display_zone_label(zone),
+                    zone["type"],
+                    json.dumps(zone.get("points", []), ensure_ascii=False),
+                    zone["x1"],
+                    zone["y1"],
+                    zone["x2"],
+                    zone["y2"],
+                )
+                for zone in zones
+            ],
+        )
+
+        for filename in csv_files:
+            path = output_dir / filename
+            table_name = sqlite_table_name(filename)
+            row_count = import_csv_to_sqlite(connection, path, table_name)
+            connection.execute(
+                "INSERT INTO manifest VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    filename,
+                    "csv",
+                    filename,
+                    int(path.exists()),
+                    path.stat().st_size if path.exists() else 0,
+                    table_name,
+                    row_count,
+                ),
+            )
+
+        for filename in asset_files:
+            path = output_dir / filename
+            connection.execute(
+                "INSERT INTO manifest VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    filename,
+                    "asset",
+                    filename,
+                    int(path.exists()),
+                    path.stat().st_size if path.exists() else 0,
+                    "",
+                    0,
+                ),
+            )
+
+
 def get_store_name_from_zone(zone):
     name = display_zone_label(zone).strip()
     lower_name = name.lower()
@@ -110,6 +257,7 @@ def save_zone_report(output_dir, zones, zone_counts):
             "zone_id",
             "zone_name",
             "zone_type",
+            "points_json",
             "x1",
             "y1",
             "x2",
@@ -121,6 +269,7 @@ def save_zone_report(output_dir, zones, zone_counts):
                 zone["id"],
                 display_zone_label(zone),
                 zone["type"],
+                json.dumps(zone.get("points", []), ensure_ascii=False),
                 zone["x1"],
                 zone["y1"],
                 zone["x2"],
@@ -526,10 +675,14 @@ def run_analysis_job(analysis_id):
     draw_zones_on_frame = vision_utils.draw_zones_on_frame
     generate_final_heatmap = vision_utils.generate_final_heatmap
     point_inside_zone = vision_utils.point_inside_zone
+    normalize_zone_geometry = vision_utils.normalize_zone_geometry
 
     try:
         video_path = str(Path(analysis.video.path))
-        zones = [zone.copy() for zone in analysis.zones]
+        zones = [
+            normalize_zone_geometry(zone.copy(), analysis.frame_width, analysis.frame_height)
+            for zone in analysis.zones
+        ]
         if not zones:
             fail_analysis(analysis_id, "Debes configurar al menos una zona antes de iniciar.")
             return
@@ -926,6 +1079,16 @@ def run_analysis_job(analysis_id):
                         center_y,
                     )
                     if not is_confirmed:
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (160, 160, 160), 1)
+                        cv2.putText(
+                            frame,
+                            "validando",
+                            (x1, max(y1 - 10, 20)),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.55,
+                            (160, 160, 160),
+                            1,
+                        )
                         continue
                     visible_confirmed_people.add(person_id)
                     processed_inactive_people.discard(person_id)
@@ -961,6 +1124,18 @@ def run_analysis_job(analysis_id):
                         "y": center_y,
                         "active_zones": set(active_zone_state[person_id]),
                     }
+                    label = person_labels[person_id]
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (50, 213, 131), 2)
+                    cv2.putText(
+                        frame,
+                        label,
+                        (x1, max(y1 - 10, 20)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.65,
+                        (50, 213, 131),
+                        2,
+                    )
+                    cv2.circle(frame, (center_x, center_y), 4, (214, 255, 114), -1)
 
             for person_id, last_data in list(last_seen_data.items()):
                 if person_id in visible_confirmed_people or person_id in processed_inactive_people:
@@ -1064,6 +1239,7 @@ def run_analysis_job(analysis_id):
             raw_track_count=len(raw_tracks_seen),
             confirmed_people_count=len(confirmed_people),
         )
+        build_results_database(output_dir, analysis_id, video_path, zones)
 
         update_analysis(
             analysis_id,

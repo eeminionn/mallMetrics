@@ -439,7 +439,8 @@ label {
 
 input[type="text"],
 input[type="password"],
-input[type="file"] {
+input[type="file"],
+input[list] {
   width: 100%;
   min-height: 44px;
   padding: 11px 12px;
@@ -679,6 +680,51 @@ input[type="file"] {
   justify-content: center;
 }
 
+.study-filter {
+  display: grid;
+  grid-template-columns: 120px minmax(180px, 1fr) 120px minmax(180px, 1fr) auto auto;
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.study-filter label {
+  margin-bottom: 12px;
+}
+
+.study-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.study-group {
+  display: grid;
+  gap: 12px;
+}
+
+.group-heading,
+.category-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.group-heading {
+  padding: 14px 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.group-heading h2,
+.category-heading h3 {
+  margin: 0;
+}
+
+.category-heading {
+  padding-top: 6px;
+  color: var(--muted);
+}
+
 .study-list {
   display: grid;
   gap: 10px;
@@ -700,6 +746,10 @@ input[type="file"] {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.study-actions form {
+  margin: 0;
 }
 
 .ok { color: #bff0d2; }
@@ -724,6 +774,10 @@ input[type="file"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .study-filter {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .study-row {
     grid-template-columns: 1fr;
   }
@@ -734,7 +788,8 @@ input[type="file"] {
   .app-shell.auth-shell .content { padding: 18px; }
   .page-bar { display: grid; }
   .kpi-grid,
-  .workflow { grid-template-columns: 1fr; }
+  .workflow,
+  .study-filter { grid-template-columns: 1fr; }
 
   .login-view {
     min-height: auto;

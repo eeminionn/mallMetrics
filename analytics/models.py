@@ -1,5 +1,6 @@
 import uuid
 from pathlib import Path
+from shutil import rmtree
 
 from django.conf import settings
 from django.db import models
@@ -17,6 +18,9 @@ class AnalysisRun(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=160, blank=True)
+    mall = models.CharField(max_length=140, blank=True, db_index=True)
+    category = models.CharField(max_length=140, blank=True, db_index=True)
+    area = models.CharField(max_length=140, blank=True)
     video = models.FileField(upload_to="videos/")
     first_frame = models.FileField(upload_to="frames/", blank=True)
 
@@ -67,6 +71,35 @@ class AnalysisRun(models.Model):
     @property
     def report_media_prefix(self):
         return f"{settings.MEDIA_URL}analysis/{self.id}/"
+
+    @property
+    def results_database_path(self):
+        return self.output_path / "analysis_results.sqlite3"
+
+    @property
+    def grouping_label(self):
+        parts = [self.mall, self.category, self.area]
+        return " / ".join(part for part in parts if part) or "Sin clasificar"
+
+    def delete_artifacts(self):
+        media_root = Path(settings.MEDIA_ROOT).resolve()
+        candidates = [self.video.path if self.video else "", self.first_frame.path if self.first_frame else ""]
+        for candidate in candidates:
+            if not candidate:
+                continue
+            path = Path(candidate)
+            try:
+                if path.exists() and path.resolve().is_relative_to(media_root):
+                    path.unlink()
+            except OSError:
+                pass
+
+        output_path = self.output_path
+        try:
+            if output_path.exists() and output_path.resolve().is_relative_to(media_root):
+                rmtree(output_path, ignore_errors=True)
+        except OSError:
+            pass
 
     def mark_running(self):
         self.status = self.Status.RUNNING

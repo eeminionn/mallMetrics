@@ -9,6 +9,8 @@ from .models import AnalysisRun
 
 
 REPORT_FILES = {
+    "database": "analysis_results.sqlite3",
+    "heatmap": "heatmap_final.png",
     "summary": "analytics_summary.csv",
     "zones": "reporte_zonas.csv",
     "zone_metrics": "zone_metrics.csv",
@@ -41,6 +43,29 @@ def read_csv_dicts(filename, analysis=None):
         except UnicodeDecodeError:
             continue
     return []
+
+
+def ensure_results_database(analysis):
+    if analysis is None:
+        return
+    database_path = report_path(REPORT_FILES["database"], analysis)
+    if database_path.exists():
+        return
+    if not report_path(REPORT_FILES["summary"], analysis).exists() and not report_path(REPORT_FILES["heatmap"], analysis).exists():
+        return
+
+    try:
+        import vision_utils
+
+        from .analysis_engine import build_results_database
+
+        zones = [
+            vision_utils.normalize_zone_geometry(zone.copy(), analysis.frame_width, analysis.frame_height)
+            for zone in analysis.zones
+        ]
+        build_results_database(analysis.output_path, analysis.pk, analysis.video.path, zones)
+    except Exception:
+        return
 
 
 def safe_int(value):
@@ -211,6 +236,8 @@ def dashboard_context(analysis=None):
     if analysis is None:
         analysis = latest_relevant_analysis()
 
+    ensure_results_database(analysis)
+
     zone_rows = read_csv_dicts(REPORT_FILES["zones"], analysis)
     zone_metric_rows = read_csv_dicts(REPORT_FILES["zone_metrics"], analysis)
     store_rows = read_csv_dicts(REPORT_FILES["stores"], analysis)
@@ -248,7 +275,12 @@ def dashboard_context(analysis=None):
         "heatmap_url": f"{analysis.report_media_prefix}heatmap_final.png" if analysis else settings.MEDIA_URL + "reports/heatmap_final.png",
         "chart_payload": json.dumps(chart_payload),
         "report_files": [
-            {"name": label, "filename": filename, "exists": report_path(filename, analysis).exists()}
+            {
+                "name": label,
+                "filename": filename,
+                "exists": report_path(filename, analysis).exists(),
+                "url": f"{analysis.report_media_prefix}{filename}" if analysis and report_path(filename, analysis).exists() else "",
+            }
             for label, filename in REPORT_FILES.items()
         ],
     }

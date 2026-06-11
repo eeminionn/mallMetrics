@@ -10,10 +10,10 @@
   const clearZones = document.getElementById("clearZones");
   const ctx = canvas.getContext("2d");
 
-  let zones = Array.isArray(initialZones) ? [...initialZones] : [];
+  let zones = Array.isArray(initialZones) ? initialZones.map(normalizeClientZone) : [];
   let currentType = "puerta";
   let drawing = false;
-  let resizing = null;
+  let draggingPoint = null;
   let start = null;
   let pointer = null;
   let labelHitAreas = [];
@@ -29,15 +29,60 @@
     return `${style.label} ${zones.filter(zone => zone.type === type).length + 1}`;
   }
 
-  function normalizeZone(zone) {
-    const x1 = Math.min(zone.x1, zone.x2);
-    const x2 = Math.max(zone.x1, zone.x2);
-    const y1 = Math.min(zone.y1, zone.y2);
-    const y2 = Math.max(zone.y1, zone.y2);
-    zone.x1 = x1;
-    zone.x2 = x2;
-    zone.y1 = y1;
-    zone.y2 = y2;
+  function clampOriginalPoint(point) {
+    return {
+      x: Math.round(Math.max(0, Math.min(frameWidth - 1, Number(point.x) || 0))),
+      y: Math.round(Math.max(0, Math.min(frameHeight - 1, Number(point.y) || 0)))
+    };
+  }
+
+  function rectanglePoints(x1, y1, x2, y2) {
+    const left = Math.min(x1, x2);
+    const right = Math.max(x1, x2);
+    const top = Math.min(y1, y2);
+    const bottom = Math.max(y1, y2);
+    return [
+      { x: left, y: top },
+      { x: right, y: top },
+      { x: right, y: bottom },
+      { x: left, y: bottom }
+    ];
+  }
+
+  function zonePoints(zone) {
+    if (Array.isArray(zone.points) && zone.points.length >= 4) {
+      return zone.points.slice(0, 4).map(clampOriginalPoint);
+    }
+    return rectanglePoints(zone.x1 || 0, zone.y1 || 0, zone.x2 || 0, zone.y2 || 0);
+  }
+
+  function updateBounds(zone) {
+    zone.points = zonePoints(zone);
+    const xs = zone.points.map(point => point.x);
+    const ys = zone.points.map(point => point.y);
+    zone.x1 = Math.min(...xs);
+    zone.y1 = Math.min(...ys);
+    zone.x2 = Math.max(...xs);
+    zone.y2 = Math.max(...ys);
+    return zone;
+  }
+
+  function normalizeClientZone(zone) {
+    return updateBounds({ ...zone, points: zonePoints(zone) });
+  }
+
+  function polygonArea(points) {
+    let area = 0;
+    points.forEach((point, index) => {
+      const next = points[(index + 1) % points.length];
+      area += point.x * next.y - next.x * point.y;
+    });
+    return Math.abs(area) / 2;
+  }
+
+  function isValidZone(zone) {
+    updateBounds(zone);
+    return (zone.x2 - zone.x1) >= 10 && (zone.y2 - zone.y1) >= 10 && polygonArea(zone.points) >= 80;
   }
 
   function buildTypeButtons() {
@@ -71,18 +116,18 @@
     draw();
   }
 
-  function originalToCanvas(x, y) {
+  function originalToCanvas(point) {
     return {
-      x: metrics.offsetX + x * metrics.scale,
-      y: metrics.offsetY + y * metrics.scale
+      x: metrics.offsetX + point.x * metrics.scale,
+      y: metrics.offsetY + point.y * metrics.scale
     };
   }
 
   function canvasToOriginal(x, y) {
-    return {
-      x: Math.round(Math.max(0, Math.min(frameWidth - 1, (x - metrics.offsetX) / metrics.scale))),
-      y: Math.round(Math.max(0, Math.min(frameHeight - 1, (y - metrics.offsetY) / metrics.scale)))
-    };
+    return clampOriginalPoint({
+      x: (x - metrics.offsetX) / metrics.scale,
+      y: (y - metrics.offsetY) / metrics.scale
+    });
   }
 
   function insideImage(x, y) {
@@ -96,21 +141,31 @@
     };
   }
 
-  function zoneCanvasRect(zone) {
-    const a = originalToCanvas(zone.x1, zone.y1);
-    const b = originalToCanvas(zone.x2, zone.y2);
+  function canvasPoints(zone) {
+    return zonePoints(zone).map(originalToCanvas);
+  }
+
+  function zoneCanvasBounds(points) {
+    const xs = points.map(point => point.x);
+    const ys = points.map(point => point.y);
     return {
-      x: Math.min(a.x, b.x),
-      y: Math.min(a.y, b.y),
-      w: Math.abs(b.x - a.x),
-      h: Math.abs(b.y - a.y),
-      corners: {
-        nw: { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) },
-        ne: { x: Math.max(a.x, b.x), y: Math.min(a.y, b.y) },
-        se: { x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) },
-        sw: { x: Math.min(a.x, b.x), y: Math.max(a.y, b.y) }
-      }
+      x: Math.min(...xs),
+      y: Math.min(...ys),
+      w: Math.max(...xs) - Math.min(...xs),
+      h: Math.max(...ys) - Math.min(...ys)
     };
+  }
+
+  function drawPath(points) {
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      if (index === 0) {
+        ctx.moveTo(point.x, point.y);
+      } else {
+        ctx.lineTo(point.x, point.y);
+      }
+    });
+    ctx.closePath();
   }
 
   function drawHandle(point, color) {
@@ -146,21 +201,23 @@
 
   function drawZone(zone, index, isDraft) {
     const style = zoneStyles[zone.type] || zoneStyles.zona;
-    const rect = zoneCanvasRect(zone);
+    const points = canvasPoints(zone);
+    const bounds = zoneCanvasBounds(points);
     ctx.save();
     ctx.strokeStyle = style.hex;
     ctx.fillStyle = `${style.hex}22`;
     ctx.lineWidth = isDraft ? 2 : 3;
     if (isDraft) ctx.setLineDash([8, 6]);
-    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    drawPath(points);
+    ctx.fill();
+    ctx.stroke();
 
     if (!isDraft) {
       const label = zone.name || zone.id;
       ctx.setLineDash([]);
       const labelW = Math.min(Math.max(label.length * 8 + 48, 150), 310);
-      const labelY = Math.max(metrics.offsetY + 8, rect.y - 32);
-      const labelX = Math.min(rect.x, metrics.offsetX + metrics.displayW - labelW - 4);
+      const labelY = Math.max(metrics.offsetY + 8, bounds.y - 32);
+      const labelX = Math.min(bounds.x, metrics.offsetX + metrics.displayW - labelW - 4);
       const editX = labelX + labelW - 26;
       const editY = labelY + 4;
 
@@ -175,9 +232,8 @@
       ctx.fillText(label, labelX + 10, labelY + 17);
 
       drawEditIcon(editX + 8, editY + 8);
-
       labelHitAreas.push({ index, x: editX, y: editY, w: 18, h: 18 });
-      Object.values(rect.corners).forEach(point => drawHandle(point, style.hex));
+      points.forEach(point => drawHandle(point, style.hex));
     }
     ctx.restore();
   }
@@ -197,7 +253,11 @@
     if (drawing && start && pointer) {
       const a = canvasToOriginal(start.x, start.y);
       const b = canvasToOriginal(pointer.x, pointer.y);
-      drawZone({ type: currentType, name: "Nueva zona", x1: a.x, y1: a.y, x2: b.x, y2: b.y }, -1, true);
+      drawZone({
+        type: currentType,
+        name: "Nueva zona",
+        points: rectanglePoints(a.x, a.y, b.x, b.y)
+      }, -1, true);
     }
     zoneCount.textContent = `${zones.length} ${zones.length === 1 ? "zona" : "zonas"}`;
   }
@@ -214,28 +274,25 @@
     ));
   }
 
-  function findCornerHit(point) {
+  function findPointHit(point) {
     for (let index = zones.length - 1; index >= 0; index -= 1) {
-      const rect = zoneCanvasRect(zones[index]);
-      for (const [corner, handle] of Object.entries(rect.corners)) {
+      const points = canvasPoints(zones[index]);
+      for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
+        const handle = points[pointIndex];
         const distance = Math.hypot(point.x - handle.x, point.y - handle.y);
         if (distance <= 11) {
-          return { index, corner };
+          return { index, pointIndex };
         }
       }
     }
     return null;
   }
 
-  function applyResize(point) {
-    if (!resizing) return;
-    const zone = zones[resizing.index];
-    const p = canvasToOriginal(point.x, point.y);
-
-    if (resizing.corner.includes("n")) zone.y1 = p.y;
-    if (resizing.corner.includes("s")) zone.y2 = p.y;
-    if (resizing.corner.includes("w")) zone.x1 = p.x;
-    if (resizing.corner.includes("e")) zone.x2 = p.x;
+  function applyPointDrag(point) {
+    if (!draggingPoint) return;
+    const zone = zones[draggingPoint.index];
+    zone.points[draggingPoint.pointIndex] = canvasToOriginal(point.x, point.y);
+    updateBounds(zone);
   }
 
   function editZoneName(index) {
@@ -261,11 +318,11 @@
       return;
     }
 
-    const cornerHit = findCornerHit(point);
-    if (cornerHit) {
-      resizing = cornerHit;
+    const pointHit = findPointHit(point);
+    if (pointHit) {
+      draggingPoint = pointHit;
       canvas.setPointerCapture(event.pointerId);
-      canvas.style.cursor = `${cornerHit.corner}-resize`;
+      canvas.style.cursor = "grabbing";
       return;
     }
 
@@ -280,8 +337,8 @@
   canvas.addEventListener("pointermove", event => {
     const point = pointerFromEvent(event);
 
-    if (resizing) {
-      applyResize(clampCanvas(point.x, point.y));
+    if (draggingPoint) {
+      applyPointDrag(clampCanvas(point.x, point.y));
       draw();
       return;
     }
@@ -293,20 +350,20 @@
     }
 
     const editHit = findEditHit(point);
-    const cornerHit = findCornerHit(point);
+    const pointHit = findPointHit(point);
     if (editHit) {
       canvas.style.cursor = "pointer";
-    } else if (cornerHit) {
-      canvas.style.cursor = `${cornerHit.corner}-resize`;
+    } else if (pointHit) {
+      canvas.style.cursor = "grab";
     } else {
       canvas.style.cursor = insideImage(point.x, point.y) ? "crosshair" : "default";
     }
   });
 
   canvas.addEventListener("pointerup", event => {
-    if (resizing) {
-      normalizeZone(zones[resizing.index]);
-      resizing = null;
+    if (draggingPoint) {
+      updateBounds(zones[draggingPoint.index]);
+      draggingPoint = null;
       releasePointer(event);
       canvas.style.cursor = "crosshair";
       draw();
@@ -319,20 +376,14 @@
     pointer = clampCanvas(endPoint.x, endPoint.y);
     const a = canvasToOriginal(start.x, start.y);
     const b = canvasToOriginal(pointer.x, pointer.y);
-    const x1 = Math.min(a.x, b.x);
-    const x2 = Math.max(a.x, b.x);
-    const y1 = Math.min(a.y, b.y);
-    const y2 = Math.max(a.y, b.y);
-    if (Math.abs(x2 - x1) >= 10 && Math.abs(y2 - y1) >= 10) {
-      zones.push({
-        id: nextZoneId(currentType),
-        name: zoneName.value.trim() || defaultName(currentType),
-        type: currentType,
-        x1,
-        y1,
-        x2,
-        y2
-      });
+    const zone = updateBounds({
+      id: nextZoneId(currentType),
+      name: zoneName.value.trim() || defaultName(currentType),
+      type: currentType,
+      points: rectanglePoints(a.x, a.y, b.x, b.y)
+    });
+    if (isValidZone(zone)) {
+      zones.push(zone);
       zoneName.value = "";
     }
     start = null;
@@ -343,7 +394,7 @@
 
   canvas.addEventListener("pointercancel", event => {
     drawing = false;
-    resizing = null;
+    draggingPoint = null;
     start = null;
     pointer = null;
     releasePointer(event);
@@ -362,7 +413,7 @@
   });
 
   form.addEventListener("submit", () => {
-    zones.forEach(normalizeZone);
+    zones = zones.filter(isValidZone).map(updateBounds);
     zonesInput.value = JSON.stringify(zones);
   });
 

@@ -14,6 +14,7 @@ urlpatterns = [
     path("analyses/<uuid:pk>/status/", views.analysis_status, name="analysis_status"),
     path("analyses/<uuid:pk>/start/", views.start_analysis, name="start_analysis"),
     path("analyses/<uuid:pk>/cancel/", views.cancel_analysis, name="cancel_analysis"),
+    path("analyses/<uuid:pk>/delete/", views.delete_analysis, name="delete_analysis"),
     path("analyses/<uuid:pk>/progress/", views.analysis_progress, name="analysis_progress"),
     path("analyses/<uuid:pk>/results/", views.analysis_results, name="analysis_results"),
     path("reports/", views.reports, name="reports"),

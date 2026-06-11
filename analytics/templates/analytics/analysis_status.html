@@ -36,6 +36,7 @@
     <strong id="progressValue">{{ analysis.progress }}%</strong>
     <div class="run-metrics">
       <span><b id="framesDone">{{ analysis.processed_frames }}</b> frames</span>
+      <span><b id="videoTimer">00:00:00 / 00:00:00</b> video</span>
       <span><b id="peopleDone">{{ analysis.confirmed_people }}</b> personas</span>
       <span><b>{{ analysis.zones|length }}</b> zonas</span>
     </div>
@@ -94,6 +95,7 @@
     document.getElementById("progressValue").textContent = `${data.progress}%`;
     document.getElementById("framesDone").textContent = data.processed_frames;
     document.getElementById("peopleDone").textContent = data.confirmed_people;
+    document.getElementById("videoTimer").textContent = `${data.processed_time} / ${data.duration_time}`;
     document.getElementById("statusMessage").textContent = data.status_message || "";
     document.getElementById("statusLabel").textContent = statusNames[data.status] || data.status;
     document.getElementById("previewMeta").textContent = `${data.processed_frames} / ${data.total_frames}`;

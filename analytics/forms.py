@@ -6,13 +6,19 @@ from .models import AnalysisRun
 class VideoUploadForm(forms.ModelForm):
     class Meta:
         model = AnalysisRun
-        fields = ["name", "video"]
+        fields = ["name", "mall", "category", "area", "video"]
         labels = {
             "name": "Nombre del estudio",
+            "mall": "Mall",
+            "category": "Categoria",
+            "area": "Zona o sector",
             "video": "Video",
         }
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Ej: Pasillo norte - viernes 18:00"}),
+            "mall": forms.TextInput(attrs={"placeholder": "Ej: Mall Plaza Norte"}),
+            "category": forms.TextInput(attrs={"placeholder": "Ej: Retail / Food court / Accesos"}),
+            "area": forms.TextInput(attrs={"placeholder": "Ej: Piso 2 - Ala oriente"}),
         }
 
     def clean_video(self):

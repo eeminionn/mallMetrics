@@ -18,10 +18,14 @@
 </header>
 
 <section class="workflow">
-  <span>Video</span>
-  <span>Zonas</span>
+  <a href="{% url 'analysis_list' %}">Video</a>
+  <a href="{% url 'zone_editor' analysis.pk %}">Zonas</a>
   <span class="active">Analisis</span>
-  <span>Resultados</span>
+  {% if analysis.status == "completed" %}
+    <a href="{% url 'analysis_results' analysis.pk %}">Resultados</a>
+  {% else %}
+    <span class="disabled">Resultados</span>
+  {% endif %}
 </section>
 
 <section class="status-layout">
@@ -54,6 +58,19 @@
       </a>
     </div>
   </article>
+  <article class="panel preview-panel">
+    <div class="panel-title">
+      <h2>Frame en vivo</h2>
+      <span id="previewMeta">{{ analysis.processed_frames }} / {{ analysis.total_frames }}</span>
+    </div>
+    <div class="preview-shell">
+      <img id="previewFrame" alt="Frame analizado" class="hidden">
+      <div id="previewEmpty" class="empty-state">
+        <i data-lucide="scan-line"></i>
+        <span>Esperando frames</span>
+      </div>
+    </div>
+  </article>
 </section>
 {% endblock %}
 
@@ -79,6 +96,14 @@
     document.getElementById("peopleDone").textContent = data.confirmed_people;
     document.getElementById("statusMessage").textContent = data.status_message || "";
     document.getElementById("statusLabel").textContent = statusNames[data.status] || data.status;
+    document.getElementById("previewMeta").textContent = `${data.processed_frames} / ${data.total_frames}`;
+    const previewFrame = document.getElementById("previewFrame");
+    const previewEmpty = document.getElementById("previewEmpty");
+    if (data.preview_url) {
+      previewFrame.src = data.preview_url;
+      previewFrame.classList.remove("hidden");
+      previewEmpty.classList.add("hidden");
+    }
     const errorBox = document.getElementById("errorBox");
     if (data.error_message) {
       errorBox.textContent = data.error_message;

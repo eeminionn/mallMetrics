@@ -15,10 +15,14 @@
 </header>
 
 <section class="workflow">
-  <span>Video</span>
+  <a href="{% url 'analysis_list' %}">Video</a>
   <span class="active">Zonas</span>
-  <span>Analisis</span>
-  <span>Resultados</span>
+  <a href="{% url 'analysis_status' analysis.pk %}">Analisis</a>
+  {% if analysis.status == "completed" %}
+    <a href="{% url 'analysis_results' analysis.pk %}">Resultados</a>
+  {% else %}
+    <span class="disabled">Resultados</span>
+  {% endif %}
 </section>
 
 <form method="post" id="zonesForm" class="zone-layout">

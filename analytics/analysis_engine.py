@@ -858,6 +858,10 @@ def run_analysis_job(analysis_id):
             add_event("zone_exit", person_id, current_time, frame_index, center_x, center_y, zone, raw_track_id=raw_track_id)
 
         update_analysis(analysis_id, status_message="Analizando video con filtros estadisticos")
+        preview_path = output_dir / "preview_frame.jpg"
+        preview_interval = max(display_every_n_frames * 6, 12)
+        preview_max_width = 1280
+        processing_started_at = time.perf_counter()
 
         while True:
             if should_cancel(analysis_id):
@@ -992,14 +996,25 @@ def run_analysis_job(analysis_id):
                 best_score = score
                 best_frame = frame.copy()
 
-            if frame_count % max(display_every_n_frames * 6, 12) == 0:
+            if frame_count % preview_interval == 0:
                 progress = int((frame_count / max(total_frames, 1)) * 100)
+                preview_frame = frame
+                if frame_width > preview_max_width:
+                    preview_scale = preview_max_width / frame_width
+                    preview_frame = cv2.resize(
+                        frame,
+                        (preview_max_width, int(frame_height * preview_scale)),
+                        interpolation=cv2.INTER_AREA,
+                    )
+                elapsed = max(time.perf_counter() - processing_started_at, 0.001)
+                analysis_fps = frame_count / elapsed
+                cv2.imwrite(str(preview_path), preview_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 72])
                 update_analysis(
                     analysis_id,
                     progress=min(progress, 99),
                     processed_frames=frame_count,
                     confirmed_people=len(person_labels),
-                    status_message=f"Frame {frame_count:,} de {total_frames:,}",
+                    status_message=f"Frame {frame_count:,} de {total_frames:,} | {analysis_fps:.1f} fps",
                 )
 
         cap.release()

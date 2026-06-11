@@ -11,6 +11,10 @@
   </div>
   <div class="actions">
     <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Estudios</span></a>
+    {% if analysis %}
+      <a class="ghost-button" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Editar zonas</span></a>
+      <a class="ghost-button" href="{% url 'analysis_status' analysis.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+    {% endif %}
     <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo estudio</span></a>
   </div>
 </header>
@@ -126,9 +130,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
 <script>
   const chartData = {{ chart_payload|safe }};
-  const palette = ["#2F80ED", "#27AE60", "#F2994A", "#D94F70", "#00A8A8", "#7C5CFF", "#8A6F4D", "#6E7B8B"];
-  Chart.defaults.color = "#AAB2C0";
-  Chart.defaults.borderColor = "#243047";
+  const palette = ["#32D583", "#F4F7F5", "#D6FF72", "#FF5F7A", "#00D9A6", "#8BE9C4", "#7C8B80", "#E0E5E1"];
+  Chart.defaults.color = "#A8B8AE";
+  Chart.defaults.borderColor = "#244035";
   Chart.defaults.font.family = "Arial, Helvetica, sans-serif";
 
   function hasRows(rows) {
@@ -140,7 +144,7 @@
       type: "bar",
       data: {
         labels: chartData.ranking.map(row => row.label),
-        datasets: [{ data: chartData.ranking.map(row => row.value), backgroundColor: "#2F80ED", borderRadius: 4 }]
+        datasets: [{ data: chartData.ranking.map(row => row.value), backgroundColor: "#32D583", borderRadius: 4 }]
       },
       options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
     });
@@ -152,8 +156,8 @@
       data: {
         labels: chartData.time.map(row => row.label),
         datasets: [
-          { label: "Personas", data: chartData.time.map(row => row.visible), borderColor: "#27AE60", backgroundColor: "rgba(39,174,96,.12)", tension: .28, fill: true },
-          { label: "Eventos", data: chartData.time.map(row => row.events), borderColor: "#F2994A", tension: .28 }
+          { label: "Personas", data: chartData.time.map(row => row.visible), borderColor: "#32D583", backgroundColor: "rgba(50,213,131,.14)", tension: .28, fill: true },
+          { label: "Eventos", data: chartData.time.map(row => row.events), borderColor: "#D6FF72", tension: .28 }
         ]
       },
       options: { responsive: true, plugins: { legend: { position: "bottom" } }, scales: { y: { beginAtZero: true } } }
@@ -177,8 +181,8 @@
       data: {
         labels: chartData.stairs.map(row => row.label),
         datasets: [
-          { label: "Suben", data: chartData.stairs.map(row => row.up), backgroundColor: "#27AE60", borderRadius: 4 },
-          { label: "Bajan", data: chartData.stairs.map(row => row.down), backgroundColor: "#D94F70", borderRadius: 4 }
+          { label: "Suben", data: chartData.stairs.map(row => row.up), backgroundColor: "#32D583", borderRadius: 4 },
+          { label: "Bajan", data: chartData.stairs.map(row => row.down), backgroundColor: "#FF5F7A", borderRadius: 4 }
         ]
       },
       options: { responsive: true, plugins: { legend: { position: "bottom" } }, scales: { y: { beginAtZero: true } } }

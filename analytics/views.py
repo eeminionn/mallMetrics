@@ -139,6 +139,10 @@ def reports(request, pk=None):
 @login_required
 def analysis_progress(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
+    preview_path = analysis.output_path / "preview_frame.jpg"
+    preview_url = ""
+    if preview_path.exists():
+        preview_url = f"{analysis.report_media_prefix}preview_frame.jpg?v={int(analysis.updated_at.timestamp())}"
     return JsonResponse({
         "id": str(analysis.id),
         "status": analysis.status,
@@ -148,6 +152,7 @@ def analysis_progress(request, pk):
         "confirmed_people": analysis.confirmed_people,
         "status_message": analysis.status_message,
         "error_message": analysis.error_message,
+        "preview_url": preview_url,
         "results_url": reverse("analysis_results", kwargs={"pk": analysis.pk}),
     })
 

@@ -36,6 +36,17 @@ button, input { font: inherit; }
   grid-template-columns: 280px minmax(0, 1fr);
 }
 
+.app-shell.auth-shell {
+  display: block;
+}
+
+.app-shell.auth-shell .content {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
 .sidebar {
   background: #111315;
   border-right: 1px solid var(--border);
@@ -351,6 +362,7 @@ th {
 }
 
 .login-view {
+  width: min(1180px, 100%);
   min-height: calc(100vh - 60px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 420px;
@@ -360,7 +372,8 @@ th {
 
 .login-hero h1 {
   margin: 10px 0;
-  font-size: clamp(54px, 8vw, 98px);
+  font-size: clamp(52px, 7vw, 88px);
+  line-height: .95;
   letter-spacing: 0;
 }
 
@@ -368,6 +381,7 @@ th {
   max-width: 700px;
   color: #cdd6df;
   font-size: 20px;
+  line-height: 1.45;
 }
 
 .product-tag {
@@ -664,8 +678,22 @@ input[type="file"] {
 }
 
 @media (max-width: 640px) {
-  .content { padding: 18px; }
+  .content,
+  .app-shell.auth-shell .content { padding: 18px; }
   .page-bar { display: grid; }
   .kpi-grid,
   .workflow { grid-template-columns: 1fr; }
+
+  .login-view {
+    min-height: auto;
+    gap: 22px;
+  }
+
+  .login-hero h1 {
+    font-size: clamp(42px, 15vw, 58px);
+  }
+
+  .login-hero p {
+    font-size: 16px;
+  }
 }

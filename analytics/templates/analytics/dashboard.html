@@ -1,0 +1,189 @@
+{% extends "analytics/base.html" %}
+
+{% block title %}Resultados | mallMetrics{% endblock %}
+
+{% block content %}
+<header class="page-bar">
+  <div>
+    <span class="eyebrow">Panel analitico</span>
+    <h1>{% if analysis %}{{ analysis.display_name }}{% else %}Resultados{% endif %}</h1>
+    <p>{% if analysis %}Estado: {{ analysis.get_status_display }}{% else %}Crea un estudio para generar metricas de flujo.{% endif %}</p>
+  </div>
+  <div class="actions">
+    <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Estudios</span></a>
+    <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo estudio</span></a>
+  </div>
+</header>
+
+{% if analysis %}
+  <section class="kpi-grid">
+    <article class="kpi kpi-blue">
+      <span>Personas validadas</span>
+      <strong>{{ summary.total_people|default:"-" }}</strong>
+      <small>Tracks confirmados por persistencia</small>
+    </article>
+    <article class="kpi kpi-green">
+      <span>Entradas a zonas</span>
+      <strong>{{ summary.total_zone_entries|default:"0" }}</strong>
+      <small>Cruces con permanencia minima</small>
+    </article>
+    <article class="kpi kpi-amber">
+      <span>Ingresos tienda</span>
+      <strong>{{ summary.total_store_entries|default:"0" }}</strong>
+      <small>Estimacion por puertas</small>
+    </article>
+    <article class="kpi kpi-rose">
+      <span>Permanencia prom.</span>
+      <strong>{{ summary.avg_dwell_time|default:"-" }}</strong>
+      <small>Tiempo medio observado</small>
+    </article>
+  </section>
+
+  <section class="analysis-grid">
+    <article class="panel heatmap-panel">
+      <div class="panel-title">
+        <h2>Mapa de calor</h2>
+        <a href="{% url 'reports_for_analysis' analysis.pk %}">Archivos</a>
+      </div>
+      {% if has_heatmap %}
+        <img class="heatmap" src="{{ heatmap_url }}" alt="Mapa de calor generado">
+      {% else %}
+        <div class="empty-state">
+          <i data-lucide="map"></i>
+          <span>Sin heatmap generado</span>
+        </div>
+      {% endif %}
+    </article>
+
+    <article class="panel">
+      <div class="panel-title"><h2>Ranking operativo</h2></div>
+      <canvas id="rankingChart" height="260"></canvas>
+    </article>
+
+    <article class="panel">
+      <div class="panel-title"><h2>Flujo temporal</h2></div>
+      <canvas id="timeChart" height="250"></canvas>
+    </article>
+
+    <article class="panel">
+      <div class="panel-title"><h2>Distribucion por tienda</h2></div>
+      <canvas id="storeChart" height="250"></canvas>
+    </article>
+
+    <article class="panel">
+      <div class="panel-title"><h2>Escaleras</h2></div>
+      <canvas id="stairsChart" height="250"></canvas>
+    </article>
+  </section>
+
+  <section class="panel data-panel">
+    <div class="panel-title">
+      <h2>Detalle por zona</h2>
+      <span>{{ zone_rows|length }} registros</span>
+    </div>
+    {% if zone_rows %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Zona</th>
+              <th>Tipo</th>
+              <th>Entradas</th>
+              <th>Salidas</th>
+              <th>Personas unicas</th>
+              <th>Permanencia</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in zone_rows %}
+              <tr>
+                <td>{{ row.zone_name|default:row.zone_id }}</td>
+                <td><span class="type-pill">{{ row.zone_type }}</span></td>
+                <td>{{ row.entry_count|default:"0" }}</td>
+                <td>{{ row.exit_count|default:"0" }}</td>
+                <td>{{ row.unique_people_count|default:"-" }}</td>
+                <td>{{ row.avg_dwell_time_formatted|default:"-" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state"><i data-lucide="table"></i><span>Sin registros de zona</span></div>
+    {% endif %}
+  </section>
+{% else %}
+  <section class="empty-dashboard">
+    <i data-lucide="file-video"></i>
+    <h2>No hay estudios todavia</h2>
+    <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Crear primer estudio</span></a>
+  </section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if analysis %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<script>
+  const chartData = {{ chart_payload|safe }};
+  const palette = ["#2F80ED", "#27AE60", "#F2994A", "#D94F70", "#00A8A8", "#7C5CFF", "#8A6F4D", "#6E7B8B"];
+  Chart.defaults.color = "#AAB2C0";
+  Chart.defaults.borderColor = "#243047";
+  Chart.defaults.font.family = "Arial, Helvetica, sans-serif";
+
+  function hasRows(rows) {
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
+  if (hasRows(chartData.ranking)) {
+    new Chart(document.getElementById("rankingChart"), {
+      type: "bar",
+      data: {
+        labels: chartData.ranking.map(row => row.label),
+        datasets: [{ data: chartData.ranking.map(row => row.value), backgroundColor: "#2F80ED", borderRadius: 4 }]
+      },
+      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+    });
+  }
+
+  if (hasRows(chartData.time)) {
+    new Chart(document.getElementById("timeChart"), {
+      type: "line",
+      data: {
+        labels: chartData.time.map(row => row.label),
+        datasets: [
+          { label: "Personas", data: chartData.time.map(row => row.visible), borderColor: "#27AE60", backgroundColor: "rgba(39,174,96,.12)", tension: .28, fill: true },
+          { label: "Eventos", data: chartData.time.map(row => row.events), borderColor: "#F2994A", tension: .28 }
+        ]
+      },
+      options: { responsive: true, plugins: { legend: { position: "bottom" } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+
+  if (hasRows(chartData.storeFlow)) {
+    new Chart(document.getElementById("storeChart"), {
+      type: "doughnut",
+      data: {
+        labels: chartData.storeFlow.map(row => row.label),
+        datasets: [{ data: chartData.storeFlow.map(row => row.value), backgroundColor: palette, borderWidth: 0 }]
+      },
+      options: { responsive: true, cutout: "62%", plugins: { legend: { position: "bottom" } } }
+    });
+  }
+
+  if (hasRows(chartData.stairs)) {
+    new Chart(document.getElementById("stairsChart"), {
+      type: "bar",
+      data: {
+        labels: chartData.stairs.map(row => row.label),
+        datasets: [
+          { label: "Suben", data: chartData.stairs.map(row => row.up), backgroundColor: "#27AE60", borderRadius: 4 },
+          { label: "Bajan", data: chartData.stairs.map(row => row.down), backgroundColor: "#D94F70", borderRadius: 4 }
+        ]
+      },
+      options: { responsive: true, plugins: { legend: { position: "bottom" } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

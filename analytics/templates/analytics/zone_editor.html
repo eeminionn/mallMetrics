@@ -1,0 +1,61 @@
+{% extends "analytics/base.html" %}
+
+{% block title %}Zonas | mallMetrics{% endblock %}
+
+{% block content %}
+<header class="page-bar">
+  <div>
+    <span class="eyebrow">Paso 2 de 4</span>
+    <h1>{{ analysis.display_name }}</h1>
+    <p>{{ analysis.frame_width }}x{{ analysis.frame_height }} · {{ analysis.total_frames }} frames</p>
+  </div>
+  <div class="actions">
+    <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Estudios</span></a>
+  </div>
+</header>
+
+<section class="workflow">
+  <span>Video</span>
+  <span class="active">Zonas</span>
+  <span>Analisis</span>
+  <span>Resultados</span>
+</section>
+
+<form method="post" id="zonesForm" class="zone-layout">
+  {% csrf_token %}
+  <input type="hidden" name="zones" id="zonesInput">
+
+  <section class="panel zone-stage">
+    <div class="panel-title">
+      <h2>Mapa de zonas</h2>
+      <span id="zoneCount">0 zonas</span>
+    </div>
+    <div class="canvas-shell">
+      <canvas id="zoneCanvas"></canvas>
+      <img id="frameImage" src="{{ analysis.first_frame.url }}" alt="Frame base" hidden>
+    </div>
+  </section>
+
+  <aside class="panel zone-tools">
+    <div class="panel-title"><h2>Tipo de zona</h2></div>
+    <div class="zone-type-list" id="zoneTypes"></div>
+    <label for="zoneName">Nombre</label>
+    <input id="zoneName" type="text" placeholder="Ej: Puerta tienda A">
+    <div class="tool-row">
+      <button class="ghost-button" type="button" id="undoZone"><i data-lucide="undo-2"></i><span>Deshacer</span></button>
+      <button class="danger-button" type="button" id="clearZones"><i data-lucide="trash-2"></i><span>Limpiar</span></button>
+    </div>
+    <button class="primary-button full" type="submit"><i data-lucide="save"></i><span>Guardar zonas</span></button>
+  </aside>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const zoneStyles = {{ zone_styles|safe }};
+  const initialZones = {{ zones_json|safe }};
+  const frameWidth = {{ analysis.frame_width }};
+  const frameHeight = {{ analysis.frame_height }};
+</script>
+<script src="/static/analytics/zone-editor.js"></script>
+{% endblock %}

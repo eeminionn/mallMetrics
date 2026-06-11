@@ -15,6 +15,7 @@ Thumbs.db
 
 # Base de datos local
 usuarios.db
+db.sqlite3
 
 # Resultados generados
 heatmap_final.png
@@ -28,6 +29,8 @@ zone_events.csv
 person_tracks.csv
 
 # Videos locales pesados
+media/
+staticfiles/
 *.mp4
 *.avi
 *.mov

@@ -1,0 +1,99 @@
+{% extends "analytics/base.html" %}
+
+{% block title %}Analisis | mallMetrics{% endblock %}
+
+{% block content %}
+<header class="page-bar">
+  <div>
+    <span class="eyebrow">Paso 3 de 4</span>
+    <h1>{{ analysis.display_name }}</h1>
+    <p id="statusMessage">{{ analysis.status_message }}</p>
+  </div>
+  <div class="actions">
+    <a class="ghost-button" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+    {% if analysis.status == "completed" %}
+      <a class="primary-button" href="{% url 'analysis_results' analysis.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
+    {% endif %}
+  </div>
+</header>
+
+<section class="workflow">
+  <span>Video</span>
+  <span>Zonas</span>
+  <span class="active">Analisis</span>
+  <span>Resultados</span>
+</section>
+
+<section class="status-layout">
+  <article class="panel run-panel">
+    <div class="status-orb status-{{ analysis.status }}"><i data-lucide="activity"></i></div>
+    <h2 id="statusLabel">{{ analysis.get_status_display }}</h2>
+    <div class="progress-track"><span id="progressBar" style="width: {{ analysis.progress }}%"></span></div>
+    <strong id="progressValue">{{ analysis.progress }}%</strong>
+    <div class="run-metrics">
+      <span><b id="framesDone">{{ analysis.processed_frames }}</b> frames</span>
+      <span><b id="peopleDone">{{ analysis.confirmed_people }}</b> personas</span>
+      <span><b>{{ analysis.zones|length }}</b> zonas</span>
+    </div>
+    <div id="errorBox" class="form-error {% if not analysis.error_message %}hidden{% endif %}">{{ analysis.error_message }}</div>
+    <div class="actions centered">
+      {% if analysis.status != "running" and analysis.status != "completed" %}
+        <form method="post" action="{% url 'start_analysis' analysis.pk %}">
+          {% csrf_token %}
+          <button class="primary-button" type="submit"><i data-lucide="play"></i><span>Ejecutar analisis</span></button>
+        </form>
+      {% endif %}
+      {% if analysis.status == "running" %}
+        <form method="post" action="{% url 'cancel_analysis' analysis.pk %}">
+          {% csrf_token %}
+          <button class="danger-button" type="submit"><i data-lucide="square"></i><span>Cancelar</span></button>
+        </form>
+      {% endif %}
+      <a id="resultsLink" class="primary-button {% if analysis.status != 'completed' %}hidden{% endif %}" href="{% url 'analysis_results' analysis.pk %}">
+        <i data-lucide="bar-chart-3"></i><span>Ver resultados</span>
+      </a>
+    </div>
+  </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const progressUrl = "{% url 'analysis_progress' analysis.pk %}";
+  const resultsUrl = "{% url 'analysis_results' analysis.pk %}";
+  const statusNames = {
+    draft: "Borrador",
+    ready: "Listo",
+    running: "Analizando",
+    completed: "Completado",
+    failed: "Fallido",
+    canceled: "Cancelado"
+  };
+
+  async function refreshProgress() {
+    const response = await fetch(progressUrl);
+    const data = await response.json();
+    document.getElementById("progressBar").style.width = `${data.progress}%`;
+    document.getElementById("progressValue").textContent = `${data.progress}%`;
+    document.getElementById("framesDone").textContent = data.processed_frames;
+    document.getElementById("peopleDone").textContent = data.confirmed_people;
+    document.getElementById("statusMessage").textContent = data.status_message || "";
+    document.getElementById("statusLabel").textContent = statusNames[data.status] || data.status;
+    const errorBox = document.getElementById("errorBox");
+    if (data.error_message) {
+      errorBox.textContent = data.error_message;
+      errorBox.classList.remove("hidden");
+    }
+    if (data.status === "completed") {
+      document.getElementById("resultsLink").classList.remove("hidden");
+      window.location.href = resultsUrl;
+      return;
+    }
+    if (data.status === "running") {
+      window.setTimeout(refreshProgress, 1600);
+    }
+  }
+
+  refreshProgress();
+</script>
+{% endblock %}

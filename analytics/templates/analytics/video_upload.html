@@ -1,0 +1,46 @@
+{% extends "analytics/base.html" %}
+
+{% block title %}Nuevo estudio | mallMetrics{% endblock %}
+
+{% block content %}
+<header class="page-bar">
+  <div>
+    <span class="eyebrow">Paso 1 de 4</span>
+    <h1>Nuevo estudio</h1>
+    <p>Registra un video para generar zonas, analisis y resultados.</p>
+  </div>
+  <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="arrow-left"></i><span>Estudios</span></a>
+</header>
+
+<section class="workflow">
+  <span class="active">Video</span>
+  <span>Zonas</span>
+  <span>Analisis</span>
+  <span>Resultados</span>
+</section>
+
+<section class="form-layout">
+  <form class="panel upload-panel" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="panel-title"><h2>Datos del estudio</h2></div>
+    {{ form.non_field_errors }}
+    <label for="{{ form.name.id_for_label }}">Nombre</label>
+    {{ form.name }}
+    {{ form.name.errors }}
+    <label for="{{ form.video.id_for_label }}">Archivo de video</label>
+    {{ form.video }}
+    {{ form.video.errors }}
+    <button class="primary-button full" type="submit"><i data-lucide="arrow-right"></i><span>Continuar a zonas</span></button>
+  </form>
+
+  <aside class="panel checklist">
+    <div class="panel-title"><h2>Criterios recomendados</h2></div>
+    <ul>
+      <li><i data-lucide="check"></i><span>Plano estable de pasillo o local</span></li>
+      <li><i data-lucide="check"></i><span>Video con personas visibles a cuerpo completo</span></li>
+      <li><i data-lucide="check"></i><span>Zonas alineadas a puertas, frentes y escaleras</span></li>
+      <li><i data-lucide="check"></i><span>Iluminacion suficiente para seguimiento YOLO</span></li>
+    </ul>
+  </aside>
+</section>
+{% endblock %}

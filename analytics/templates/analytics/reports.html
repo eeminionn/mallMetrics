@@ -1,0 +1,59 @@
+{% extends "analytics/base.html" %}
+
+{% block title %}Reportes | mallMetrics{% endblock %}
+
+{% block content %}
+<header class="page-bar">
+  <div>
+    <span class="eyebrow">Auditoria</span>
+    <h1>Reportes CSV</h1>
+    <p>{% if analysis %}{{ analysis.display_name }}{% else %}Ultimo estudio disponible{% endif %}</p>
+  </div>
+  <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Estudios</span></a>
+</header>
+
+<section class="panel data-panel">
+  <div class="panel-title">
+    <h2>Archivos generados</h2>
+    {% if analysis %}<span>{{ analysis.get_status_display }}</span>{% endif %}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Reporte</th><th>Archivo</th><th>Estado</th></tr></thead>
+      <tbody>
+        {% for report in report_files %}
+          <tr>
+            <td>{{ report.name }}</td>
+            <td>{{ report.filename }}</td>
+            <td>{% if report.exists %}<span class="ok">Disponible</span>{% else %}<span class="missing">Pendiente</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel data-panel">
+  <div class="panel-title"><h2>Eventos recientes</h2><span>{{ event_rows|length }} filas</span></div>
+  {% if event_rows %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tiempo</th><th>Evento</th><th>Persona</th><th>Zona</th><th>Tienda</th></tr></thead>
+        <tbody>
+          {% for row in event_rows %}
+            <tr>
+              <td>{{ row.timestamp }}</td>
+              <td>{{ row.event_type }}</td>
+              <td>{{ row.person_label|default:row.person_id }}</td>
+              <td>{{ row.zone_name|default:"-" }}</td>
+              <td>{{ row.store_name|default:"-" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state"><i data-lucide="list-tree"></i><span>Sin eventos exportados</span></div>
+  {% endif %}
+</section>
+{% endblock %}

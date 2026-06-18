@@ -1,4 +1,4 @@
-# mallMetrics
+# People Metrics
 
 Aplicacion migrada a Django para revisar metricas de flujo peatonal, reportes CSV y mapas de calor desde el navegador.
 

@@ -1,13 +1,13 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Mall's | mallMetrics{% endblock %}
+{% block title %}Establecimientos | People Metrics{% endblock %}
 
 {% block content %}
 <header class="page-bar">
   <div>
     <span class="eyebrow">Pipeline</span>
-    <h1>Mall's</h1>
-    <p>Gestiona malls, reorganiza analisis por contexto operativo y ajusta la estructura antes de entrar al detalle.</p>
+    <h1>Establecimientos</h1>
+    <p>Gestiona establecimientos, reorganiza analisis por contexto operativo y ajusta la estructura antes de entrar al detalle.</p>
   </div>
   <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
 </header>
@@ -16,12 +16,12 @@
   <form class="panel add-mall-form" method="post" action="{% url 'create_mall' %}">
     {% csrf_token %}
     <div class="panel-title">
-      <h2>Agregar mall</h2>
+      <h2>Agregar establecimiento</h2>
       <span>Sin crear analisis</span>
     </div>
     <div class="add-mall-fields">
       <div class="field-group">
-        <label for="{{ mall_form.name.id_for_label }}">Nombre del mall</label>
+        <label for="{{ mall_form.name.id_for_label }}">Nombre del establecimiento</label>
         {{ mall_form.name }}
       </div>
       <div class="field-group">
@@ -37,7 +37,7 @@
         <label for="{{ mall_form.notes.id_for_label }}">Notas operativas</label>
         {{ mall_form.notes }}
       </div>
-      <button class="primary-button" type="submit"><i data-lucide="building-2"></i><span>Crear mall</span></button>
+      <button class="primary-button" type="submit"><i data-lucide="building-2"></i><span>Crear establecimiento</span></button>
     </div>
   </form>
 
@@ -74,17 +74,17 @@
         <article class="mall-column" data-mall-id="{{ column.id }}" style="--mall-accent: {{ column.accent_color }};">
           <div class="mall-column-head">
             <div>
-              <span class="eyebrow">Mall</span>
+              <span class="eyebrow">Establecimiento</span>
               <h2>{{ column.name }}</h2>
               {% if column.notes %}<p>{{ column.notes }}</p>{% endif %}
             </div>
             <div class="actions">
               <span class="status-chip">{{ column.count }}</span>
               {% if column.id %}
-                <a class="ghost-button icon-button" href="{% url 'mall_detail' column.id %}" aria-label="Editar mall" title="Editar mall"><i data-lucide="pencil"></i></a>
-                <form method="post" action="{% url 'delete_mall' column.id %}" data-confirm-title="Eliminar mall" data-confirm-message="Se eliminara {{ column.name }} y los analisis quedaran sin mall asignado." data-confirm-label="Eliminar mall">
+                <a class="ghost-button icon-button" href="{% url 'mall_detail' column.id %}" aria-label="Editar establecimiento" title="Editar establecimiento"><i data-lucide="pencil"></i></a>
+                <form method="post" action="{% url 'delete_mall' column.id %}" data-confirm-title="Eliminar establecimiento" data-confirm-message="Se eliminara {{ column.name }} y los analisis quedaran sin establecimiento asignado." data-confirm-label="Eliminar establecimiento">
                   {% csrf_token %}
-                  <button class="danger-button icon-button" type="submit" aria-label="Eliminar mall" title="Eliminar mall"><i data-lucide="trash-2"></i></button>
+                  <button class="danger-button icon-button" type="submit" aria-label="Eliminar establecimiento" title="Eliminar establecimiento"><i data-lucide="trash-2"></i></button>
                 </form>
               {% endif %}
             </div>

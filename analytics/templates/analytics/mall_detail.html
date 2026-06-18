@@ -1,19 +1,19 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Configurar Mall | mallMetrics{% endblock %}
+{% block title %}Configurar Establecimiento | People Metrics{% endblock %}
 
 {% block content %}
 <header class="page-bar">
   <div>
     <span class="eyebrow">Configuracion</span>
     <h1>{{ mall.name }}</h1>
-    <p>Personaliza identidad, color de organizacion y contexto operativo del mall.</p>
+    <p>Personaliza identidad, color de organizacion y contexto operativo del establecimiento.</p>
   </div>
   <div class="actions">
-    <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="arrow-left"></i><span>Volver a Mall's</span></a>
-    <form method="post" action="{% url 'delete_mall' mall.pk %}" data-confirm-title="Eliminar mall" data-confirm-message="Se eliminara {{ mall.name }} y los analisis quedaran sin mall asignado." data-confirm-label="Eliminar mall">
+    <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="arrow-left"></i><span>Volver a Establecimientos</span></a>
+    <form method="post" action="{% url 'delete_mall' mall.pk %}" data-confirm-title="Eliminar establecimiento" data-confirm-message="Se eliminara {{ mall.name }} y los analisis quedaran sin establecimiento asignado." data-confirm-label="Eliminar establecimiento">
       {% csrf_token %}
-      <button class="danger-button icon-button" type="submit" aria-label="Eliminar mall" title="Eliminar mall"><i data-lucide="trash-2"></i></button>
+      <button class="danger-button icon-button" type="submit" aria-label="Eliminar establecimiento" title="Eliminar establecimiento"><i data-lucide="trash-2"></i></button>
     </form>
   </div>
 </header>
@@ -21,7 +21,7 @@
 <section class="form-layout">
   <form class="panel upload-panel" method="post">
     {% csrf_token %}
-    <div class="panel-title"><h2>Identidad del mall</h2></div>
+    <div class="panel-title"><h2>Identidad del establecimiento</h2></div>
     <label for="{{ form.name.id_for_label }}">Nombre</label>
     {{ form.name }}
     {{ form.name.errors }}

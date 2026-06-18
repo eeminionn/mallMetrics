@@ -28,7 +28,7 @@ def report_path(filename, analysis=None):
         return Path(analysis.output_dir) / filename
     if analysis is not None:
         return analysis.output_path / filename
-    return Path(settings.MALLMETRICS_REPORT_DIR) / filename
+    return Path(getattr(settings, "PEOPLEMETRICS_REPORT_DIR", settings.BASE_DIR)) / filename
 
 
 def read_csv_dicts(filename, analysis=None):

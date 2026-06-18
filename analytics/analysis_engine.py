@@ -1125,14 +1125,14 @@ def run_analysis_job(analysis_id):
                         "active_zones": set(active_zone_state[person_id]),
                     }
                     label = person_labels[person_id]
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (50, 213, 131), 2)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (235, 99, 37), 2)
                     cv2.putText(
                         frame,
                         label,
                         (x1, max(y1 - 10, 20)),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.65,
-                        (50, 213, 131),
+                        (235, 99, 37),
                         2,
                     )
                     cv2.circle(frame, (center_x, center_y), 4, (214, 255, 114), -1)

@@ -1,15 +1,15 @@
-# Estudio de flujo UX - mallMetrics
+# Estudio de flujo UX - People Metrics
 
 ## Objetivo del producto
 
-mallMetrics se reorganiza como una herramienta web para analistas de datos retail. El foco no es solo ejecutar YOLO, sino convertir un video en un estudio auditable: zonas, eventos, metricas, heatmap y reportes.
+People Metrics se reorganiza como una herramienta web para analistas de datos operativos. El foco no es solo ejecutar YOLO, sino convertir un video en un estudio auditable: zonas, eventos, metricas, heatmap y reportes.
 
 ## Usuario principal
 
-Analista de datos o operaciones de centro comercial que necesita:
+Analista de datos u operaciones de espacios fisicos que necesita:
 
 - Cargar videos por sector, fecha u horario.
-- Definir zonas de negocio: puerta, frente de tienda, escalera, salida y zona general.
+- Definir zonas de interes: puerta, acceso, escalera, salida y zona general.
 - Ejecutar analisis reproducibles.
 - Revisar metricas accionables.
 - Auditar CSV y eventos cuando un resultado requiere explicacion.
@@ -50,7 +50,7 @@ Analista de datos o operaciones de centro comercial que necesita:
 ## Criterios visuales
 
 - Paleta base neutra para largas sesiones de analisis.
-- Acentos por semantica: azul accion, verde validacion, ambar oportunidad, rosa alerta, teal distribucion.
+- Acentos por semantica: azul accion, cian validacion, ambar oportunidad, rosa alerta y azul claro distribucion.
 - Iconografia Lucide para acciones y estados.
 - Chart.js para graficos consistentes y responsivos.
 - Layout denso y escaneable, sin composicion de landing page.

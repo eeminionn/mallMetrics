@@ -3,23 +3,23 @@
     --font-sans: "Inter", "SF Pro Display", "Segoe UI", sans-serif;
     --font-mono: "IBM Plex Mono", "SFMono-Regular", monospace;
 
-    --color-obsidian: #050806;
-    --color-carbon: #070b08;
-    --color-panel: #0c120e;
-    --color-panel-2: #111a14;
-    --color-panel-3: #18251d;
-    --color-line: #24382c;
-    --color-copy: #f5fff8;
-    --color-muted: #a5b7aa;
-    --color-quiet: #74857a;
-    --color-signal: #32d583;
-    --color-signal-strong: #64f0a5;
+    --color-obsidian: #05070d;
+    --color-carbon: #070b14;
+    --color-panel: #0b1220;
+    --color-panel-2: #111827;
+    --color-panel-3: #172554;
+    --color-line: #1e3a5f;
+    --color-copy: #f8fbff;
+    --color-muted: #a8b6d6;
+    --color-quiet: #7385a6;
+    --color-signal: #2563eb;
+    --color-signal-strong: #60a5fa;
     --color-amber-signal: #d6ff72;
     --color-rose-signal: #ff5f7a;
-    --color-teal-signal: #00d9a6;
-    --color-success-panel: #0d1f14;
-    --color-success-border: #316c49;
-    --color-success-copy: #d7ffea;
+    --color-teal-signal: #38bdf8;
+    --color-success-panel: #0b1f3d;
+    --color-success-border: #1d4ed8;
+    --color-success-copy: #dbeafe;
     --color-danger-panel: #30161d;
     --color-danger-border: #7c2f42;
     --color-danger-copy: #ffd7dc;
@@ -37,14 +37,14 @@
     body {
       @apply m-0 min-h-screen bg-obsidian font-sans text-copy;
       background-image:
-        radial-gradient(circle at top left, rgba(50, 213, 131, 0.11), transparent 32%),
-        radial-gradient(circle at top right, rgba(214, 255, 114, 0.05), transparent 24%),
-        linear-gradient(180deg, #040705 0%, #050806 44%, #020402 100%);
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.11), transparent 32%),
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 24%),
+        linear-gradient(180deg, #040712 0%, #05070d 44%, #02040a 100%);
     }
 
     ::selection {
-      background: rgba(50, 213, 131, 0.28);
-      color: #f5fff8;
+      background: rgba(37, 99, 235, 0.28);
+      color: #f8fbff;
     }
 
     a {
@@ -109,7 +109,7 @@
 
     .sidebar {
       @apply fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-col gap-6 border-r border-line px-5 py-6 transition duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0;
-      background-color: rgba(7, 11, 8, 0.96);
+      background-color: rgba(7, 11, 20, 0.96);
       backdrop-filter: blur(18px);
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
     }
@@ -127,7 +127,7 @@
     }
 
     .brand-mark {
-      @apply grid h-11 w-11 place-items-center rounded-lg border border-[#315b43] bg-[#0e1b13] font-mono text-base font-semibold text-signal;
+      @apply grid h-11 w-11 place-items-center rounded-lg border border-[#1d4ed8] bg-[#081226] font-mono text-base font-semibold text-signal;
     }
 
     .brand strong,
@@ -159,17 +159,17 @@
     }
 
     .nav a.active {
-      @apply border-[#2d5a40] bg-panel-2 text-copy;
-      box-shadow: inset 0 0 0 1px rgba(50, 213, 131, 0.18);
+      @apply border-[#1e40af] bg-panel-2 text-copy;
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
     }
 
     .primary-button {
-      @apply border-[#64f0a5] bg-signal text-[#031009] hover:-translate-y-px hover:brightness-105;
-      box-shadow: 0 0 0 1px rgba(50, 213, 131, 0.12), 0 10px 24px rgba(50, 213, 131, 0.12);
+      @apply border-[#60a5fa] bg-signal text-white hover:-translate-y-px hover:brightness-110;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.16), 0 10px 24px rgba(37, 99, 235, 0.22);
     }
 
     .ghost-button {
-      @apply border-line bg-panel-2 text-copy hover:-translate-y-px hover:border-[#36543f] hover:bg-panel-3;
+      @apply border-line bg-panel-2 text-copy hover:-translate-y-px hover:border-[#2563eb] hover:bg-panel-3;
     }
 
     .danger-button {
@@ -321,11 +321,11 @@
     }
 
     .kpi-blue {
-      border-top-color: #32d583;
+      border-top-color: #2563eb;
     }
 
     .kpi-green {
-      border-top-color: #00d9a6;
+      border-top-color: #38bdf8;
     }
 
     .kpi-amber {
@@ -354,7 +354,7 @@
     }
 
     .heatmap {
-      @apply block w-full rounded-lg border border-line bg-[#030604] object-contain;
+      @apply block w-full rounded-lg border border-line bg-[#030712] object-contain;
       max-height: 620px;
     }
 
@@ -379,7 +379,7 @@
     }
 
     tbody tr:hover {
-      background: rgba(17, 26, 20, 0.7);
+      background: rgba(15, 23, 42, 0.7);
     }
 
     .type-pill,
@@ -389,11 +389,11 @@
     }
 
     .status-running {
-      @apply border-signal text-[#c6ffd9];
+      @apply border-signal text-[#dbeafe];
     }
 
     .status-completed {
-      @apply border-teal-signal text-[#bff0d2];
+      @apply border-teal-signal text-[#bfdbfe];
     }
 
     .status-failed,
@@ -406,7 +406,7 @@
     }
 
     .status-draft {
-      @apply border-[#5d6b62] text-[#c5d0c8];
+      @apply border-[#475569] text-[#cbd5e1];
     }
 
     .empty-state,
@@ -434,7 +434,7 @@
     }
 
     .product-tag {
-      @apply inline-flex items-center rounded-full border border-[#2d5a40] bg-[#09100c] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-signal;
+      @apply inline-flex items-center rounded-full border border-[#1e40af] bg-[#08111f] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-signal;
     }
 
     .login-proof {
@@ -468,15 +468,15 @@
     }
 
     .workflow a:hover {
-      @apply border-[#3c7d56] bg-[#0e1b13] text-copy;
+      @apply border-[#2563eb] bg-[#081226] text-copy;
     }
 
     .workflow .active {
-      @apply border-signal bg-copy text-[#031009];
+      @apply border-signal bg-signal text-white;
     }
 
     .workflow .disabled {
-      @apply bg-carbon text-[#536359];
+      @apply bg-carbon text-[#64748b];
     }
 
     .form-layout,
@@ -512,7 +512,7 @@
     }
 
     .canvas-shell {
-      @apply overflow-hidden rounded-lg border border-line bg-[#030604];
+      @apply overflow-hidden rounded-lg border border-line bg-[#030712];
       min-height: 600px;
       height: calc(100% - 2.5rem);
     }
@@ -588,7 +588,7 @@
     }
 
     .preview-shell {
-      @apply grid place-items-center overflow-hidden rounded-lg border border-line bg-[#030604];
+      @apply grid place-items-center overflow-hidden rounded-lg border border-line bg-[#030712];
       min-height: 360px;
     }
 
@@ -666,9 +666,9 @@
 
     .mall-column {
       @apply grid gap-3 rounded-lg border border-line p-4;
-      background: linear-gradient(180deg, rgba(12, 18, 14, 0.98), rgba(8, 13, 10, 0.98));
+      background: linear-gradient(180deg, rgba(9, 17, 31, 0.98), rgba(6, 12, 24, 0.98));
       border-left-width: 8px;
-      border-left-color: var(--mall-accent, #32d583);
+      border-left-color: var(--mall-accent, #2563eb);
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
       grid-template-rows: auto minmax(0, 1fr);
       min-height: 620px;
@@ -689,7 +689,7 @@
 
     .mall-dropzone.drag-over {
       @apply border-signal;
-      background: rgba(50, 213, 131, 0.08);
+      background: rgba(37, 99, 235, 0.08);
     }
 
     .mall-empty {
@@ -697,7 +697,7 @@
     }
 
     .study-card {
-      @apply grid gap-3 rounded-lg border border-line bg-[#09100c] p-4;
+      @apply grid gap-3 rounded-lg border border-line bg-[#08111f] p-4;
       cursor: grab;
     }
 
@@ -803,8 +803,8 @@
     }
 
     .analysis-tab.is-emphasis {
-      @apply border-[#64f0a5] bg-signal text-[#031009] hover:bg-[#64f0a5] hover:text-[#031009];
-      box-shadow: 0 8px 20px rgba(50, 213, 131, 0.12);
+      @apply border-[#60a5fa] bg-signal text-white hover:bg-[#60a5fa] hover:text-white;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
     }
 
     .study-card p {
@@ -827,13 +827,13 @@
 
     .mall-summary-card {
       @apply grid overflow-hidden rounded-lg border border-line;
-      background: linear-gradient(180deg, rgba(12, 18, 14, 0.98), rgba(8, 13, 10, 0.98));
+      background: linear-gradient(180deg, rgba(9, 17, 31, 0.98), rgba(6, 12, 24, 0.98));
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
       grid-template-columns: 8px minmax(0, 1fr);
     }
 
     .mall-summary-accent {
-      background: var(--mall-accent, #32d583);
+      background: var(--mall-accent, #2563eb);
     }
 
     .mall-summary-body {
@@ -859,7 +859,7 @@
     }
 
     .mini-kpi {
-      @apply rounded-lg border border-line bg-[#09100c] p-4;
+      @apply rounded-lg border border-line bg-[#08111f] p-4;
     }
 
     .mini-kpi span {
@@ -875,7 +875,7 @@
     }
 
     .study-row {
-      @apply grid gap-3 rounded-lg border border-line bg-[#090f0b] p-4;
+      @apply grid gap-3 rounded-lg border border-line bg-[#08111f] p-4;
     }
 
     .study-actions {
@@ -892,7 +892,7 @@
     }
 
     .ok {
-      @apply font-medium text-[#bff0d2];
+      @apply font-medium text-[#bfdbfe];
     }
 
     .missing {

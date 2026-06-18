@@ -17,7 +17,7 @@ def format_context_label(value):
 
 class Mall(models.Model):
     name = models.CharField(max_length=140, unique=True)
-    accent_color = models.CharField(max_length=7, default="#32D583")
+    accent_color = models.CharField(max_length=7, default="#2563eb")
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

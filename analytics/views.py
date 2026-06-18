@@ -102,8 +102,8 @@ def resolve_mall_group(name):
 
 def board_columns(analyses):
     columns = []
-    all_malls = list(Mall.objects.all())
-    analyses_by_mall = {mall.id: [] for mall in all_malls}
+    all_establecimientos = list(Mall.objects.all())
+    analyses_by_mall = {establecimiento.id: [] for establecimiento in all_establecimientos}
     unassigned = []
 
     for analysis in analyses:
@@ -112,20 +112,20 @@ def board_columns(analyses):
         else:
             unassigned.append(analysis)
 
-    for mall in all_malls:
+    for establecimiento in all_establecimientos:
         columns.append({
-            "id": str(mall.id),
-            "name": mall.name,
-            "accent_color": mall.accent_color,
-            "notes": mall.notes,
-            "count": len(analyses_by_mall[mall.id]),
-            "items": analyses_by_mall[mall.id],
+            "id": str(establecimiento.id),
+            "name": establecimiento.name,
+            "accent_color": establecimiento.accent_color,
+            "notes": establecimiento.notes,
+            "count": len(analyses_by_mall[establecimiento.id]),
+            "items": analyses_by_mall[establecimiento.id],
         })
 
     columns.append({
         "id": "",
-        "name": "Sin mall asignado",
-        "accent_color": "#5D6B62",
+        "name": "Sin establecimiento asignado",
+        "accent_color": "#475569",
         "notes": "",
         "count": len(unassigned),
         "items": unassigned,
@@ -151,7 +151,7 @@ def mall_board(request):
         "board_columns": board_columns(analyses),
         "category_options": category_options,
         "selected_category": selected_category,
-        "mall_form": MallForm(initial={"accent_color": "#FFFFFF"}),
+        "mall_form": MallForm(initial={"accent_color": "#2563EB"}),
     })
 
 
@@ -301,11 +301,11 @@ def create_mall(request):
             mall_group.notes = form.cleaned_data["notes"]
             mall_group.save(update_fields=["accent_color", "notes", "updated_at"])
         if created:
-            messages.success(request, f"Mall creado: {mall_group.name}")
+            messages.success(request, f"Establecimiento creado: {mall_group.name}")
         else:
-            messages.error(request, f"El mall {mall_group.name} ya existe.")
+            messages.error(request, f"El establecimiento {mall_group.name} ya existe.")
     else:
-        messages.error(request, "No se pudo crear el mall.")
+        messages.error(request, "No se pudo crear el establecimiento.")
     return redirect("mall_board")
 
 
@@ -318,7 +318,7 @@ def mall_detail(request, pk):
             form.save()
             Mall.objects.filter(pk=mall.pk).update(updated_at=timezone.now())
             AnalysisRun.objects.filter(mall_group=mall).update(mall=mall.name)
-            messages.success(request, f"Mall actualizado: {mall.name}")
+            messages.success(request, f"Establecimiento actualizado: {mall.name}")
             return redirect("mall_board")
     else:
         form = MallForm(instance=mall)
@@ -359,12 +359,12 @@ def move_analysis_to_mall(request, pk):
 @login_required
 @require_POST
 def delete_mall(request, pk):
-    mall = get_object_or_404(Mall, pk=pk)
-    linked_analyses = AnalysisRun.objects.filter(mall_group=mall)
+    establecimiento = get_object_or_404(Mall, pk=pk)
+    linked_analyses = AnalysisRun.objects.filter(mall_group=establecimiento)
     linked_analyses.update(mall_group=None, mall="", updated_at=timezone.now())
-    mall_name = mall.name
-    mall.delete()
-    messages.success(request, f"Mall eliminado: {mall_name}. Sus analisis quedaron sin mall asignado.")
+    mall_name = establecimiento.name
+    establecimiento.delete()
+    messages.success(request, f"Establecimiento eliminado: {mall_name}. Sus analisis quedaron sin establecimiento asignado.")
     return redirect("mall_board")
 
 

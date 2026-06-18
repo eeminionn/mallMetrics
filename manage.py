@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Django command-line utility for mallMetrics."""
+"""Django command-line utility for People Metrics."""
 import os
 import sys
 
 
 def main():
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mallmetrics_django.settings")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "peoplemetrics_django.settings")
     from django.core.management import execute_from_command_line
 
     execute_from_command_line(sys.argv)

@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}mallMetrics{% endblock %}</title>
+  <title>{% block title %}People Metrics{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -24,17 +24,17 @@
     {% if user.is_authenticated %}
       <button id="sidebarBackdrop" class="sidebar-backdrop hidden lg:hidden" type="button" aria-label="Cerrar menu"></button>
       <aside id="appSidebar" class="sidebar" data-open="false">
-        <a class="brand" href="{% url 'dashboard' %}" aria-label="mallMetrics">
-          <span class="brand-mark">mM</span>
+        <a class="brand" href="{% url 'dashboard' %}" aria-label="People Metrics">
+          <span class="brand-mark">PM</span>
           <span>
-            <strong>mallMetrics</strong>
-            <small>Retail Intelligence</small>
+            <strong>People Metrics</strong>
+            <small>People Intelligence</small>
           </span>
         </a>
 
         <nav class="nav">
           <a class="{% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'analysis_results' %}active{% endif %}" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resultados</span></a>
-          <a class="{% if request.resolver_match.url_name == 'mall_board' or request.resolver_match.url_name == 'mall_detail' %}active{% endif %}" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Mall's</span></a>
+          <a class="{% if request.resolver_match.url_name == 'mall_board' or request.resolver_match.url_name == 'mall_detail' %}active{% endif %}" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Establecimientos</span></a>
           <a class="{% if request.resolver_match.url_name == 'analysis_list' or request.resolver_match.url_name == 'zone_editor' or request.resolver_match.url_name == 'analysis_status' %}active{% endif %}" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
           <a class="{% if request.resolver_match.url_name == 'video_upload' %}active{% endif %}" href="{% url 'video_upload' %}"><i data-lucide="upload-cloud"></i><span>Nuevo analisis</span></a>
           <a class="{% if request.resolver_match.url_name == 'reports' or request.resolver_match.url_name == 'reports_for_analysis' %}active{% endif %}" href="{% url 'reports' %}"><i data-lucide="table-2"></i><span>Reportes</span></a>
@@ -58,10 +58,10 @@
       {% if user.is_authenticated %}
         <div class="mobile-shell-bar">
           <div class="mobile-shell-title">
-            <span class="brand-mark">mM</span>
+            <span class="brand-mark">PM</span>
             <span>
-              <strong>mallMetrics</strong>
-              <small>Retail Intelligence</small>
+              <strong>People Metrics</strong>
+              <small>People Intelligence</small>
             </span>
           </div>
           <button id="sidebarToggle" class="ghost-button" type="button" aria-label="Abrir menu">

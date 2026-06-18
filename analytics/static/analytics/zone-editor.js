@@ -241,12 +241,12 @@
   function draw() {
     labelHitAreas = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#050806";
+    ctx.fillStyle = "#05070d";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (image.complete) {
       ctx.drawImage(image, metrics.offsetX, metrics.offsetY, metrics.displayW, metrics.displayH);
     }
-    ctx.strokeStyle = "#32d583";
+    ctx.strokeStyle = "#2563eb";
     ctx.lineWidth = 2;
     ctx.strokeRect(metrics.offsetX, metrics.offsetY, metrics.displayW, metrics.displayH);
     zones.forEach((zone, index) => drawZone(zone, index, false));

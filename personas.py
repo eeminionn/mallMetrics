@@ -101,7 +101,7 @@ reid_max_distance_px = 85
 # Una persona debe permanecer un mínimo dentro de una zona antes de contarla.
 min_zone_presence_seconds = 0.35
 
-# Criterios de eventos retail.
+# Criterios de eventos por espacio.
 entry_disappear_seconds = 2.0
 stair_direction_threshold_px = 25
 time_bin_seconds = 30
@@ -614,11 +614,11 @@ else:
     BaseApp = ctk.CTk
 
 
-class RetailAnalyticsApp(BaseApp):
+class PeopleMetricsApp(BaseApp):
     def __init__(self):
         super().__init__()
 
-        self.title("Retail Vision Analytics")
+        self.title("People Metrics")
         self.geometry("1280x780")
         self.minsize(950, 620)
         self.configure(fg_color=APP_BG)
@@ -726,7 +726,7 @@ class RetailAnalyticsApp(BaseApp):
 
         title = ctk.CTkLabel(
             left_panel,
-            text="Retail Vision\nAnalytics",
+            text="People\nMetrics",
             font=("Segoe UI", 56, "bold"),
             text_color=TEXT_MAIN,
             justify="left",
@@ -749,7 +749,7 @@ class RetailAnalyticsApp(BaseApp):
             "Detección y seguimiento de personas con YOLO",
             "Demarcación de puertas, frentes, salidas, escaleras y zonas",
             "Mapa de calor dinámico de tránsito peatonal",
-            "Métricas profesionales para análisis retail",
+            "Métricas profesionales para análisis de personas",
         ]
 
         for feature in features:
@@ -880,7 +880,7 @@ class RetailAnalyticsApp(BaseApp):
 
         logo_sub = ctk.CTkLabel(
             sidebar,
-            text="Retail Vision Analytics",
+            text="People Metrics",
             font=("Segoe UI", 14),
             text_color="#8C96A8",
         )
@@ -2622,7 +2622,7 @@ class RetailAnalyticsApp(BaseApp):
 
 def main():
     init_database()
-    app = RetailAnalyticsApp()
+    app = PeopleMetricsApp()
     app.mainloop()
 
 

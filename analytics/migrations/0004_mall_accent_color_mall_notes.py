@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='mall',
             name='accent_color',
-            field=models.CharField(default='#32D583', max_length=7),
+            field=models.CharField(default='#2563eb', max_length=7),
         ),
         migrations.AddField(
             model_name='mall',

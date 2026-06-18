@@ -9,15 +9,15 @@ class VideoUploadForm(forms.ModelForm):
         fields = ["name", "mall", "category", "area", "video"]
         labels = {
             "name": "Nombre del analisis",
-            "mall": "Mall",
+            "mall": "Establecimiento",
             "category": "Categoria",
             "area": "Zona o sector",
             "video": "Video",
         }
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Ej: Pasillo norte - viernes 18:00"}),
-            "mall": forms.TextInput(attrs={"placeholder": "Ej: Mall Plaza Norte"}),
-            "category": forms.TextInput(attrs={"placeholder": "Ej: Retail / Food court / Accesos"}),
+            "mall": forms.TextInput(attrs={"placeholder": "Ej: Edificio Central"}),
+            "category": forms.TextInput(attrs={"placeholder": "Ej: Accesos / Salas / Operacion"}),
             "area": forms.TextInput(attrs={"placeholder": "Ej: Piso 2 - Ala oriente"}),
         }
 
@@ -35,12 +35,12 @@ class MallForm(forms.ModelForm):
         model = Mall
         fields = ["name", "accent_color", "notes"]
         labels = {
-            "name": "Nombre del mall",
+            "name": "Nombre del establecimiento",
             "accent_color": "Color de organizacion",
             "notes": "Notas operativas",
         }
         widgets = {
-            "name": forms.TextInput(attrs={"placeholder": "Ej: Mall Plaza Norte"}),
+            "name": forms.TextInput(attrs={"placeholder": "Ej: Edificio Central"}),
             "accent_color": forms.TextInput(attrs={"type": "color"}),
-            "notes": forms.Textarea(attrs={"rows": 4, "placeholder": "Ej: foco en food court, piso 2 y acceso oriente"}),
+            "notes": forms.Textarea(attrs={"rows": 4, "placeholder": "Ej: foco en acceso principal, piso 2 y sector oriente"}),
         }

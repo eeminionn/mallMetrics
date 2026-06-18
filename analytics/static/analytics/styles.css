@@ -4,7 +4,7 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #315b43 #070b08;
+  scrollbar-color: #1d4ed8 #070b14;
 }
 
 ::-webkit-scrollbar {
@@ -13,32 +13,32 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #070b08;
+  background: #070b14;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #315b43;
-  border: 2px solid #070b08;
+  background: #1d4ed8;
+  border: 2px solid #070b14;
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3c7d56;
+  background: #2563eb;
 }
 
 input[type="file"]::file-selector-button {
   margin-right: 12px;
   border: 0;
   border-radius: 8px;
-  background: #32d583;
-  color: #031009;
+  background: #2563eb;
+  color: #f8fbff;
   cursor: pointer;
   font-weight: 700;
   padding: 10px 14px;
 }
 
 input[type="file"]::file-selector-button:hover {
-  background: #64f0a5;
+  background: #60a5fa;
 }
 
 .confirm-modal {
@@ -54,7 +54,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .confirm-modal::backdrop {
-  background: rgba(3, 6, 4, 0.78);
+  background: rgba(3, 7, 18, 0.78);
   backdrop-filter: blur(8px);
 }
 

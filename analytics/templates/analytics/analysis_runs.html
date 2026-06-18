@@ -1,6 +1,6 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Analisis | mallMetrics{% endblock %}
+{% block title %}Analisis | People Metrics{% endblock %}
 
 {% block content %}
 <header class="page-bar">
@@ -10,7 +10,7 @@
     <p>Lista de corridas concretas para revisar estado, zonas, reportes y resultados.</p>
   </div>
   <div class="actions">
-    <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Mall's</span></a>
+    <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Establecimientos</span></a>
     <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
   </div>
 </header>
@@ -29,10 +29,10 @@
   </summary>
   <form class="filter-dropdown-panel study-filter" method="get">
     <div class="field-group">
-      <label for="mallFilter">Mall</label>
-      <input id="mallFilter" name="mall" list="mallOptions" type="text" value="{{ selected_mall }}" placeholder="Todos los malls">
+      <label for="mallFilter">Establecimiento</label>
+      <input id="mallFilter" name="mall" list="mallOptions" type="text" value="{{ selected_mall }}" placeholder="Todos los establecimientos">
       <datalist id="mallOptions">
-        {% for mall in mall_options %}<option value="{{ mall }}"></option>{% endfor %}
+        {% for establecimiento in mall_options %}<option value="{{ establecimiento }}"></option>{% endfor %}
       </datalist>
     </div>
     <div class="field-group">
@@ -72,7 +72,7 @@
             <div class="analysis-heading">
               <h2 class="analysis-title">{{ item.display_name }}</h2>
               <div class="analysis-context">
-                <span class="type-pill">{{ item.mall_label|default:"Sin mall" }}</span>
+                <span class="type-pill">{{ item.mall_label|default:"Sin establecimiento" }}</span>
                 <span class="type-pill">{{ item.category_label|default:"General" }}</span>
                 <span class="type-pill">{{ item.area_label|default:"Sin sector" }}</span>
               </div>

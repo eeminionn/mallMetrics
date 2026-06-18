@@ -3,7 +3,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "django-insecure-local-development-mallmetrics"
+SECRET_KEY = "django-insecure-local-development-peoplemetrics"
 DEBUG = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
@@ -27,7 +27,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "mallmetrics_django.urls"
+ROOT_URLCONF = "peoplemetrics_django.urls"
 
 TEMPLATES = [
     {
@@ -45,7 +45,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "mallmetrics_django.wsgi.application"
+WSGI_APPLICATION = "peoplemetrics_django.wsgi.application"
 
 DATABASES = {
     "default": {
@@ -76,4 +76,4 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
-MALLMETRICS_REPORT_DIR = BASE_DIR
+PEOPLEMETRICS_REPORT_DIR = BASE_DIR

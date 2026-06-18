@@ -1,6 +1,6 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Analisis | mallMetrics{% endblock %}
+{% block title %}Analisis | People Metrics{% endblock %}
 
 {% block content %}
 <header class="page-bar">
@@ -9,7 +9,7 @@
     <div class="analysis-page-heading">
       <h1 class="analysis-title">{{ analysis.display_name }}</h1>
       <div class="analysis-context">
-        <span class="type-pill">{{ analysis.mall_label|default:"Sin mall" }}</span>
+        <span class="type-pill">{{ analysis.mall_label|default:"Sin establecimiento" }}</span>
         <span class="type-pill">{{ analysis.category_label|default:"General" }}</span>
         <span class="type-pill">{{ analysis.area_label|default:"Sin sector" }}</span>
       </div>

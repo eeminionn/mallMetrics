@@ -1,17 +1,17 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Resultados | mallMetrics{% endblock %}
+{% block title %}Resultados | People Metrics{% endblock %}
 
 {% block content %}
 {% if dashboard_mode == "overview" %}
   <header class="page-bar">
     <div>
       <span class="eyebrow">Resumen ejecutivo</span>
-      <h1>Resultados por mall</h1>
-      <p>Vista general para un analista: malls, ultimos analisis, densidad y actividad resumida.</p>
+      <h1>Resultados por establecimiento</h1>
+      <p>Vista general para un analista: establecimientos, ultimos analisis, densidad y actividad resumida.</p>
     </div>
     <div class="actions">
-      <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Mall's</span></a>
+      <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Establecimientos</span></a>
       <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
     </div>
   </header>
@@ -24,13 +24,13 @@
           <div class="mall-summary-body">
             <div class="mall-summary-head">
               <div>
-                <span class="eyebrow">Mall</span>
+                <span class="eyebrow">Establecimiento</span>
                 <h2>{{ card.mall.name }}</h2>
                 <p>{{ card.analysis_count }} analisis · {{ card.completed_count }} completados</p>
               </div>
               <div class="actions">
                 <a class="ghost-button" href="{% url 'mall_detail' card.mall.pk %}"><i data-lucide="pencil"></i><span>Configurar</span></a>
-                <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="move-right"></i><span>Ver en Mall's</span></a>
+                <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="move-right"></i><span>Ver en Establecimientos</span></a>
               </div>
             </div>
 
@@ -99,7 +99,7 @@
                   {% else %}
                     <div class="empty-state">
                       <i data-lucide="file-search"></i>
-                      <span>Este mall aun no tiene analisis completados</span>
+                      <span>Este establecimiento aun no tiene analisis completados</span>
                     </div>
                   {% endif %}
                 </div>
@@ -112,8 +112,8 @@
   {% else %}
     <section class="empty-dashboard">
       <i data-lucide="building-2"></i>
-      <h2>No hay malls configurados todavia</h2>
-      <a class="primary-button" href="{% url 'mall_board' %}"><i data-lucide="plus"></i><span>Crear primer mall</span></a>
+      <h2>No hay establecimientos configurados todavia</h2>
+      <a class="primary-button" href="{% url 'mall_board' %}"><i data-lucide="plus"></i><span>Crear primer establecimiento</span></a>
     </section>
   {% endif %}
 {% else %}
@@ -123,14 +123,14 @@
       <div class="analysis-page-heading">
         <h1 class="analysis-title">{{ analysis.display_name }}</h1>
         <div class="analysis-context">
-          <span class="type-pill">{{ analysis.mall_label|default:"Sin mall" }}</span>
+          <span class="type-pill">{{ analysis.mall_label|default:"Sin establecimiento" }}</span>
           <span class="type-pill">{{ analysis.category_label|default:"General" }}</span>
           <span class="type-pill">{{ analysis.area_label|default:"Sin sector" }}</span>
         </div>
       </div>
     </div>
     <div class="actions">
-      <a class="ghost-button" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resumen malls</span></a>
+      <a class="ghost-button" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resumen establecimientos</span></a>
       <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
       <nav class="analysis-tabs" aria-label="Acciones del analisis">
         <a class="analysis-tab" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
@@ -245,9 +245,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
 <script>
   const chartData = {{ chart_payload|safe }};
-  const palette = ["#32D583", "#F4F7F5", "#D6FF72", "#FF5F7A", "#00D9A6", "#8BE9C4", "#7C8B80", "#E0E5E1"];
-  Chart.defaults.color = "#A8B8AE";
-  Chart.defaults.borderColor = "#244035";
+  const palette = ["#2563eb", "#F4F7F5", "#D6FF72", "#FF5F7A", "#38bdf8", "#93C5FD", "#8CA4C8", "#E6F0FF"];
+  Chart.defaults.color = "#A8B6D6";
+  Chart.defaults.borderColor = "#263a63";
   Chart.defaults.font.family = "Arial, Helvetica, sans-serif";
 
   function hasRows(rows) {
@@ -259,7 +259,7 @@
       type: "bar",
       data: {
         labels: chartData.ranking.map(row => row.label),
-        datasets: [{ data: chartData.ranking.map(row => row.value), backgroundColor: "#32D583", borderRadius: 4 }]
+        datasets: [{ data: chartData.ranking.map(row => row.value), backgroundColor: "#2563eb", borderRadius: 4 }]
       },
       options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
     });
@@ -271,7 +271,7 @@
       data: {
         labels: chartData.time.map(row => row.label),
         datasets: [
-          { label: "Personas", data: chartData.time.map(row => row.visible), borderColor: "#32D583", backgroundColor: "rgba(50,213,131,.14)", tension: .28, fill: true },
+          { label: "Personas", data: chartData.time.map(row => row.visible), borderColor: "#2563eb", backgroundColor: "rgba(37,99,235,.14)", tension: .28, fill: true },
           { label: "Eventos", data: chartData.time.map(row => row.events), borderColor: "#D6FF72", tension: .28 }
         ]
       },
@@ -296,7 +296,7 @@
       data: {
         labels: chartData.stairs.map(row => row.label),
         datasets: [
-          { label: "Suben", data: chartData.stairs.map(row => row.up), backgroundColor: "#32D583", borderRadius: 4 },
+          { label: "Suben", data: chartData.stairs.map(row => row.up), backgroundColor: "#2563eb", borderRadius: 4 },
           { label: "Bajan", data: chartData.stairs.map(row => row.down), backgroundColor: "#FF5F7A", borderRadius: 4 }
         ]
       },

@@ -1,6 +1,8 @@
-# mallMetrics
+# MallMetrics
 
-Aplicacion migrada a Django para revisar metricas de flujo peatonal, reportes CSV y mapas de calor desde el navegador.
+Version original de Mall Metrics para revisar metricas de flujo peatonal en centros comerciales, reportes CSV y mapas de calor desde el navegador.
+
+Branch principal de esta version: `MallMetrics`.
 
 ## Ejecutar la version Django
 
@@ -13,12 +15,18 @@ python manage.py ensure_admin
 python manage.py runserver
 ```
 
+En esta copia local tambien puedes usar:
+
+```bash
+./scripts/run_mallmetrics_server.sh
+```
+
 Luego abre `http://127.0.0.1:8000/` e inicia sesion con:
 
 - Usuario: `admin`
 - Contrasena: `admin`
 
-## Estado de la migracion
+## Estado de la version
 
 - `database.py` fue reemplazado en la version web por el sistema de usuarios de Django.
 - `results_view.py` fue convertido a dashboard web con Chart.js.

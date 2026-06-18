@@ -151,7 +151,7 @@ def mall_board(request):
         "board_columns": board_columns(analyses),
         "category_options": category_options,
         "selected_category": selected_category,
-        "mall_form": MallForm(initial={"accent_color": "#32D583"}),
+        "mall_form": MallForm(initial={"accent_color": "#FFFFFF"}),
     })
 
 

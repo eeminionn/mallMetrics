@@ -72,7 +72,7 @@
     }
 
     input[type="color"] {
-      @apply h-12 w-full cursor-pointer rounded-lg border border-line bg-carbon p-1;
+      @apply h-11 w-11 shrink-0 cursor-pointer rounded-lg border border-line bg-carbon p-1;
     }
 
     textarea {
@@ -151,7 +151,7 @@
     .ghost-button,
     .primary-button,
     .danger-button {
-      @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition duration-150;
+      @apply inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition duration-150;
     }
 
     .nav a {
@@ -173,7 +173,15 @@
     }
 
     .danger-button {
-      @apply border-danger-border bg-danger-panel text-danger-copy hover:-translate-y-px hover:brightness-110;
+      @apply border-danger-border bg-transparent text-danger-copy hover:-translate-y-px;
+    }
+
+    .danger-button:hover {
+      background: rgba(48, 22, 29, 0.7);
+    }
+
+    .icon-button {
+      @apply h-10 w-10 min-w-10 px-0;
     }
 
     .full {
@@ -456,7 +464,7 @@
 
     .workflow a,
     .workflow span {
-      @apply grid min-h-10 place-items-center rounded-lg border border-line bg-panel px-3 text-center text-sm font-semibold text-muted transition;
+      @apply grid min-h-10 place-items-center rounded-full border border-line bg-panel px-3 text-center text-sm font-semibold text-muted transition;
     }
 
     .workflow a:hover {
@@ -464,7 +472,7 @@
     }
 
     .workflow .active {
-      @apply border-signal bg-signal text-[#031009];
+      @apply border-signal bg-copy text-[#031009];
     }
 
     .workflow .disabled {
@@ -476,6 +484,10 @@
     .status-layout,
     .study-toolbar {
       @apply grid gap-4;
+    }
+
+    .study-toolbar {
+      @apply mb-4;
     }
 
     .field-group {
@@ -595,12 +607,57 @@
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
     }
 
+    .filter-dropdown {
+      @apply relative mb-4 self-start;
+    }
+
+    .filter-dropdown summary {
+      @apply w-max max-w-full list-none;
+    }
+
+    .filter-dropdown summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .filter-dropdown:not([open]) .filter-dropdown-panel {
+      display: none;
+    }
+
+    .filter-dropdown-panel {
+      @apply mt-3 w-full min-w-[20rem] rounded-lg border border-line bg-panel p-5;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+    }
+
     .filter-actions {
       @apply flex flex-wrap items-end gap-2;
     }
 
     .add-mall-form {
       @apply grid gap-1;
+    }
+
+    .add-mall-form textarea {
+      min-height: 44px;
+    }
+
+    .add-mall-fields {
+      @apply grid gap-3;
+    }
+
+    .color-picker-row {
+      @apply flex items-end gap-3;
+    }
+
+    .color-picker-shell {
+      @apply inline-flex h-11 items-center gap-2 rounded-lg border border-line bg-carbon px-2 text-muted;
+    }
+
+    .color-picker-shell input[type="color"] {
+      @apply border-transparent bg-transparent p-0;
+    }
+
+    .color-picker-hint {
+      @apply pb-2 text-xs leading-5 text-muted;
     }
 
     .mall-board {
@@ -651,6 +708,73 @@
     .study-card-head,
     .study-meta {
       @apply flex flex-wrap items-start justify-between gap-2.5;
+    }
+
+    .analysis-status-overline {
+      @apply mb-1 block text-[10px] font-semibold lowercase tracking-[0.12em] text-muted;
+    }
+
+    .analysis-title {
+      @apply inline-block max-w-full border-b-2 border-signal pb-1 leading-tight text-copy;
+    }
+
+    .analysis-status-overline.status-running {
+      @apply text-signal;
+    }
+
+    .analysis-status-overline.status-completed {
+      @apply text-copy;
+    }
+
+    .analysis-status-overline.status-failed,
+    .analysis-status-overline.status-canceled {
+      @apply text-rose-signal;
+    }
+
+    .analysis-status-overline.status-ready {
+      @apply text-amber-signal;
+    }
+
+    .analysis-meta {
+      @apply mt-2 flex flex-wrap items-center gap-2 text-xs text-muted;
+    }
+
+    .analysis-meta-item {
+      @apply inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-line bg-carbon px-2.5 py-1.5 text-xs font-medium text-muted;
+    }
+
+    .analysis-meta-item strong {
+      @apply font-semibold text-copy;
+    }
+
+    .meta-popover {
+      @apply relative;
+    }
+
+    .meta-popover summary {
+      @apply list-none;
+    }
+
+    .meta-popover summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .meta-popover-panel {
+      @apply absolute left-0 top-[calc(100%+.45rem)] z-20 min-w-48 rounded-lg border border-line bg-panel p-3 text-xs leading-5 text-muted;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+    }
+
+    .analysis-tabs {
+      @apply inline-flex max-w-full flex-wrap items-center gap-1 rounded-full border border-line bg-carbon p-1;
+    }
+
+    .analysis-tab {
+      @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-line hover:bg-panel-2 hover:text-copy;
+    }
+
+    .analysis-tab.is-emphasis {
+      @apply border-[#64f0a5] bg-signal text-[#031009] hover:bg-[#64f0a5] hover:text-[#031009];
+      box-shadow: 0 8px 20px rgba(50, 213, 131, 0.12);
     }
 
     .study-card p {
@@ -732,6 +856,11 @@
       @apply m-0;
     }
 
+    .study-card-head form,
+    .study-row form {
+      @apply m-0 shrink-0;
+    }
+
     .ok {
       @apply font-medium text-[#bff0d2];
     }
@@ -792,13 +921,13 @@
     }
 
     .study-toolbar {
-      grid-template-columns: minmax(20rem, 23rem) minmax(0, 24rem);
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: start;
     }
 
     .study-row {
-      grid-template-columns: minmax(0, 1fr) auto auto;
-      align-items: center;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
     }
   }
 
@@ -814,6 +943,11 @@
 
     .study-filter.compact {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .add-mall-fields {
+      grid-template-columns: minmax(14rem, 1.1fr) auto minmax(16rem, 1fr) auto;
+      align-items: end;
     }
 
     .mall-board {

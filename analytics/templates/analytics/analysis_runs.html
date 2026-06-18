@@ -15,35 +15,48 @@
   </div>
 </header>
 
-<form class="panel study-filter" method="get">
-  <div class="field-group">
-    <label for="mallFilter">Mall</label>
-    <input id="mallFilter" name="mall" list="mallOptions" type="text" value="{{ selected_mall }}" placeholder="Todos los malls">
-    <datalist id="mallOptions">
-      {% for mall in mall_options %}<option value="{{ mall }}"></option>{% endfor %}
-    </datalist>
-  </div>
-  <div class="field-group">
-    <label for="categoryFilter">Categoria</label>
-    <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
-    <datalist id="categoryOptions">
-      {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
-    </datalist>
-  </div>
-  <div class="field-group">
-    <label for="statusFilter">Estado</label>
-    <select id="statusFilter" name="status" class="select-field">
-      <option value="">Todos los estados</option>
+<details class="filter-dropdown">
+  <summary class="ghost-button">
+    <i data-lucide="sliders-horizontal"></i>
+    <span>Filtrar</span>
+    {% if selected_mall %}<span class="type-pill">{{ selected_mall }}</span>{% endif %}
+    {% if selected_category %}<span class="type-pill">{{ selected_category }}</span>{% endif %}
+    {% if selected_status %}
       {% for value, label in status_options %}
-        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+        {% if selected_status == value %}<span class="type-pill">{{ label }}</span>{% endif %}
       {% endfor %}
-    </select>
-  </div>
-  <div class="filter-actions">
-    <button class="primary-button" type="submit"><i data-lucide="filter"></i><span>Filtrar</span></button>
-    <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
-  </div>
-</form>
+    {% endif %}
+  </summary>
+  <form class="filter-dropdown-panel study-filter" method="get">
+    <div class="field-group">
+      <label for="mallFilter">Mall</label>
+      <input id="mallFilter" name="mall" list="mallOptions" type="text" value="{{ selected_mall }}" placeholder="Todos los malls">
+      <datalist id="mallOptions">
+        {% for mall in mall_options %}<option value="{{ mall }}"></option>{% endfor %}
+      </datalist>
+    </div>
+    <div class="field-group">
+      <label for="categoryFilter">Categoria</label>
+      <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
+      <datalist id="categoryOptions">
+        {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
+      </datalist>
+    </div>
+    <div class="field-group">
+      <label for="statusFilter">Estado</label>
+      <select id="statusFilter" name="status" class="select-field">
+        <option value="">Todos los estados</option>
+        {% for value, label in status_options %}
+          <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button class="ghost-button" type="submit"><i data-lucide="filter"></i><span>Aplicar</span></button>
+      <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
+    </div>
+  </form>
+</details>
 
 <section class="panel data-panel">
   <div class="panel-title">
@@ -55,20 +68,36 @@
       {% for item in analyses %}
         <article class="study-row">
           <div>
-            <h2>{{ item.display_name }}</h2>
-            <p>{{ item.mall_name|default:"Sin mall" }} · {{ item.category|default:"General" }} · {{ item.area|default:"Sin sector" }} · {{ item.created_at|date:"d/m/Y H:i" }}</p>
+            <span class="analysis-status-overline status-{{ item.status }}">{{ item.get_status_display|lower }}</span>
+            <h2 class="analysis-title">{{ item.display_name }}</h2>
+            <p>{{ item.mall_name|default:"Sin mall" }} · {{ item.category|default:"General" }} · {{ item.area|default:"Sin sector" }}</p>
+            <div class="analysis-meta">
+              <details class="meta-popover">
+                <summary class="analysis-meta-item" title="Fecha del analisis">
+                  <i data-lucide="calendar-days"></i>
+                  <strong>{{ item.created_at|date:"d" }}</strong>
+                </summary>
+                <div class="meta-popover-panel">
+                  <strong>{{ item.created_at|date:"d/m/Y" }}</strong><br>
+                  {{ item.created_at|date:"H:i" }} hrs
+                </div>
+              </details>
+              <span class="analysis-meta-item"><i data-lucide="video"></i><strong>{{ item.total_frames }}</strong> frames</span>
+              <span class="analysis-meta-item"><i data-lucide="scan"></i><strong>{{ item.frame_width }}x{{ item.frame_height }}</strong></span>
+            </div>
           </div>
-          <span class="status-chip status-{{ item.status }}">{{ item.get_status_display }}</span>
           <div class="study-actions">
-            <a class="ghost-button" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
-            <a class="ghost-button" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
-            <a class="ghost-button" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
-            {% if item.status == "completed" %}
-              <a class="primary-button" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
-            {% endif %}
+            <nav class="analysis-tabs" aria-label="Acciones del analisis">
+              <a class="analysis-tab" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+              <a class="analysis-tab" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+              <a class="analysis-tab" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
+              {% if item.status == "completed" %}
+                <a class="analysis-tab is-emphasis" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Ver resultado</span></a>
+              {% endif %}
+            </nav>
             <form method="post" action="{% url 'delete_analysis' item.pk %}" data-confirm-title="Eliminar analisis" data-confirm-message="Se eliminara {{ item.display_name }} y todos sus archivos generados." data-confirm-label="Eliminar analisis">
               {% csrf_token %}
-              <button class="danger-button" type="submit"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
+              <button class="danger-button icon-button" type="submit" aria-label="Eliminar analisis" title="Eliminar analisis"><i data-lucide="trash-2"></i></button>
             </form>
           </div>
         </article>

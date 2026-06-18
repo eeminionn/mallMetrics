@@ -19,9 +19,9 @@
   <span class="active">Zonas</span>
   <a href="{% url 'analysis_status' analysis.pk %}">Analisis</a>
   {% if analysis.status == "completed" %}
-    <a href="{% url 'analysis_results' analysis.pk %}">Resultados</a>
+    <a href="{% url 'analysis_results' analysis.pk %}">Ver resultado</a>
   {% else %}
-    <span class="disabled">Resultados</span>
+    <span class="disabled">Ver resultado</span>
   {% endif %}
 </section>
 

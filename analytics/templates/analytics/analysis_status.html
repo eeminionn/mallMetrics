@@ -10,10 +10,12 @@
     <p id="statusMessage">{{ analysis.status_message }}</p>
   </div>
   <div class="actions">
-    <a class="ghost-button" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
-    {% if analysis.status == "completed" %}
-      <a class="primary-button" href="{% url 'analysis_results' analysis.pk %}"><i data-lucide="bar-chart-3"></i><span>Resultados</span></a>
-    {% endif %}
+    <nav class="analysis-tabs" aria-label="Acciones del analisis">
+      <a class="analysis-tab" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+      {% if analysis.status == "completed" %}
+        <a class="analysis-tab is-emphasis" href="{% url 'analysis_results' analysis.pk %}"><i data-lucide="bar-chart-3"></i><span>Ver resultado</span></a>
+      {% endif %}
+    </nav>
   </div>
 </header>
 
@@ -22,9 +24,9 @@
   <a href="{% url 'zone_editor' analysis.pk %}">Zonas</a>
   <span class="active">Analisis</span>
   {% if analysis.status == "completed" %}
-    <a href="{% url 'analysis_results' analysis.pk %}">Resultados</a>
+    <a href="{% url 'analysis_results' analysis.pk %}">Ver resultado</a>
   {% else %}
-    <span class="disabled">Resultados</span>
+    <span class="disabled">Ver resultado</span>
   {% endif %}
 </section>
 
@@ -55,7 +57,7 @@
         </form>
       {% endif %}
       <a id="resultsLink" class="primary-button {% if analysis.status != 'completed' %}hidden{% endif %}" href="{% url 'analysis_results' analysis.pk %}">
-        <i data-lucide="bar-chart-3"></i><span>Ver resultados</span>
+        <i data-lucide="bar-chart-3"></i><span>Ver resultado</span>
       </a>
     </div>
   </article>

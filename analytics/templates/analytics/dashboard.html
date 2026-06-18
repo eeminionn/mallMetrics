@@ -29,8 +29,8 @@
                 <p>{{ card.analysis_count }} analisis · {{ card.completed_count }} completados</p>
               </div>
               <div class="actions">
-                <a class="ghost-button" href="{% url 'mall_detail' card.mall.pk %}"><i data-lucide="settings-2"></i><span>Configurar</span></a>
-                <a class="primary-button" href="{% url 'mall_board' %}"><i data-lucide="move-right"></i><span>Ver en Mall's</span></a>
+                <a class="ghost-button" href="{% url 'mall_detail' card.mall.pk %}"><i data-lucide="pencil"></i><span>Configurar</span></a>
+                <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="move-right"></i><span>Ver en Mall's</span></a>
               </div>
             </div>
 
@@ -64,12 +64,29 @@
                       {% for snapshot in card.recent_snapshots %}
                         <article class="study-row compact">
                           <div>
-                            <h2>{{ snapshot.analysis.display_name }}</h2>
-                            <p>{{ snapshot.analysis.created_at|date:"d/m/Y H:i" }} · {{ snapshot.analysis.category|default:"General" }}</p>
+                            <span class="analysis-status-overline status-{{ snapshot.analysis.status }}">{{ snapshot.analysis.get_status_display|lower }}</span>
+                            <h2 class="analysis-title">{{ snapshot.analysis.display_name }}</h2>
+                            <p>{{ snapshot.analysis.category|default:"General" }}</p>
+                            <div class="analysis-meta">
+                              <details class="meta-popover">
+                                <summary class="analysis-meta-item" title="Fecha del analisis">
+                                  <i data-lucide="calendar-days"></i>
+                                  <strong>{{ snapshot.analysis.created_at|date:"d" }}</strong>
+                                </summary>
+                                <div class="meta-popover-panel">
+                                  <strong>{{ snapshot.analysis.created_at|date:"d/m/Y" }}</strong><br>
+                                  {{ snapshot.analysis.created_at|date:"H:i" }} hrs
+                                </div>
+                              </details>
+                              <span class="analysis-meta-item"><i data-lucide="video"></i><strong>{{ snapshot.analysis.total_frames }}</strong> frames</span>
+                              <span class="analysis-meta-item"><i data-lucide="scan"></i><strong>{{ snapshot.analysis.frame_width }}x{{ snapshot.analysis.frame_height }}</strong></span>
+                            </div>
                           </div>
                           <div class="study-actions">
-                            <a class="ghost-button" href="{% url 'analysis_status' snapshot.analysis.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
-                            <a class="primary-button" href="{% url 'analysis_results' snapshot.analysis.pk %}"><i data-lucide="bar-chart-3"></i><span>Abrir</span></a>
+                            <nav class="analysis-tabs" aria-label="Acciones del analisis">
+                              <a class="analysis-tab" href="{% url 'analysis_status' snapshot.analysis.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+                              <a class="analysis-tab is-emphasis" href="{% url 'analysis_results' snapshot.analysis.pk %}"><i data-lucide="bar-chart-3"></i><span>Ver resultado</span></a>
+                            </nav>
                           </div>
                         </article>
                       {% endfor %}
@@ -99,13 +116,16 @@
     <div>
       <span class="eyebrow">Panel analitico</span>
       <h1>{{ analysis.display_name }}</h1>
-      <p>Estado: {{ analysis.get_status_display }}</p>
+      <p>{{ analysis.mall_name|default:"Sin mall" }} · {{ analysis.category|default:"General" }} · {{ analysis.area|default:"Sin sector" }}</p>
     </div>
     <div class="actions">
       <a class="ghost-button" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resumen malls</span></a>
       <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
-      <a class="ghost-button" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Editar zonas</span></a>
-      <a class="ghost-button" href="{% url 'analysis_status' analysis.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+      <nav class="analysis-tabs" aria-label="Acciones del analisis">
+        <a class="analysis-tab" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+        <a class="analysis-tab" href="{% url 'analysis_status' analysis.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+        <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
+      </nav>
       <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
     </div>
   </header>
@@ -137,7 +157,7 @@
     <article class="panel heatmap-panel">
       <div class="panel-title">
         <h2>Mapa de calor</h2>
-        <a href="{% url 'reports_for_analysis' analysis.pk %}">Archivos</a>
+        <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
       </div>
       {% if has_heatmap %}
         <img class="heatmap" src="{{ heatmap_url }}" alt="Mapa de calor generado">

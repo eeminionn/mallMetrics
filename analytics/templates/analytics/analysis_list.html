@@ -97,7 +97,13 @@
               <div class="study-card-head">
                 <div>
                   <span class="analysis-status-overline status-{{ item.status }}">{{ item.get_status_display|lower }}</span>
-                  <h3 class="analysis-title">{{ item.display_name }}</h3>
+                  <div class="analysis-heading">
+                    <h3 class="analysis-title">{{ item.display_name }}</h3>
+                    <div class="analysis-context">
+                      {% if item.category_label %}<span class="type-pill">{{ item.category_label }}</span>{% endif %}
+                      {% if item.area_label %}<span class="type-pill">{{ item.area_label }}</span>{% endif %}
+                    </div>
+                  </div>
                   <div class="analysis-meta">
                     <details class="meta-popover">
                       <summary class="analysis-meta-item" title="Fecha del analisis">
@@ -117,10 +123,6 @@
                   {% csrf_token %}
                   <button class="danger-button icon-button" type="submit" aria-label="Eliminar analisis" title="Eliminar analisis"><i data-lucide="trash-2"></i></button>
                 </form>
-              </div>
-              <div class="study-meta">
-                {% if item.category %}<span class="type-pill">{{ item.category }}</span>{% endif %}
-                {% if item.area %}<span class="type-pill">{{ item.area }}</span>{% endif %}
               </div>
               <div class="study-actions">
                 <nav class="analysis-tabs" aria-label="Acciones del analisis">

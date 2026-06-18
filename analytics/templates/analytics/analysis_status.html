@@ -6,7 +6,14 @@
 <header class="page-bar">
   <div>
     <span class="eyebrow">Paso 3 de 4</span>
-    <h1>{{ analysis.display_name }}</h1>
+    <div class="analysis-page-heading">
+      <h1 class="analysis-title">{{ analysis.display_name }}</h1>
+      <div class="analysis-context">
+        <span class="type-pill">{{ analysis.mall_label|default:"Sin mall" }}</span>
+        <span class="type-pill">{{ analysis.category_label|default:"General" }}</span>
+        <span class="type-pill">{{ analysis.area_label|default:"Sin sector" }}</span>
+      </div>
+    </div>
     <p id="statusMessage">{{ analysis.status_message }}</p>
   </div>
   <div class="actions">

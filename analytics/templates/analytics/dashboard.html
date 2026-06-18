@@ -65,8 +65,13 @@
                         <article class="study-row compact">
                           <div>
                             <span class="analysis-status-overline status-{{ snapshot.analysis.status }}">{{ snapshot.analysis.get_status_display|lower }}</span>
-                            <h2 class="analysis-title">{{ snapshot.analysis.display_name }}</h2>
-                            <p>{{ snapshot.analysis.category|default:"General" }}</p>
+                            <div class="analysis-heading">
+                              <h2 class="analysis-title">{{ snapshot.analysis.display_name }}</h2>
+                              <div class="analysis-context">
+                                <span class="type-pill">{{ snapshot.analysis.category_label|default:"General" }}</span>
+                                <span class="type-pill">{{ snapshot.analysis.area_label|default:"Sin sector" }}</span>
+                              </div>
+                            </div>
                             <div class="analysis-meta">
                               <details class="meta-popover">
                                 <summary class="analysis-meta-item" title="Fecha del analisis">
@@ -115,8 +120,14 @@
   <header class="page-bar">
     <div>
       <span class="eyebrow">Panel analitico</span>
-      <h1>{{ analysis.display_name }}</h1>
-      <p>{{ analysis.mall_name|default:"Sin mall" }} · {{ analysis.category|default:"General" }} · {{ analysis.area|default:"Sin sector" }}</p>
+      <div class="analysis-page-heading">
+        <h1 class="analysis-title">{{ analysis.display_name }}</h1>
+        <div class="analysis-context">
+          <span class="type-pill">{{ analysis.mall_label|default:"Sin mall" }}</span>
+          <span class="type-pill">{{ analysis.category_label|default:"General" }}</span>
+          <span class="type-pill">{{ analysis.area_label|default:"Sin sector" }}</span>
+        </div>
+      </div>
     </div>
     <div class="actions">
       <a class="ghost-button" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resumen malls</span></a>

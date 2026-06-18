@@ -1,3 +1,4 @@
+import re
 import uuid
 from pathlib import Path
 from shutil import rmtree
@@ -5,6 +6,13 @@ from shutil import rmtree
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+
+
+def format_context_label(value):
+    text = str(value or "").strip()
+    text = re.sub(r"(?<=[^\W\d_])(?=\d)", " ", text, flags=re.UNICODE)
+    text = re.sub(r"(?<=\d)(?=[^\W\d_])", " ", text, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", text)
 
 
 class Mall(models.Model):
@@ -99,7 +107,7 @@ class AnalysisRun(models.Model):
 
     @property
     def grouping_label(self):
-        parts = [self.mall_name, self.category, self.area]
+        parts = [self.mall_label, self.category_label, self.area_label]
         return " / ".join(part for part in parts if part) or "Sin clasificar"
 
     @property
@@ -107,6 +115,18 @@ class AnalysisRun(models.Model):
         if self.mall_group_id:
             return self.mall_group.name
         return self.mall
+
+    @property
+    def mall_label(self):
+        return format_context_label(self.mall_name)
+
+    @property
+    def category_label(self):
+        return format_context_label(self.category)
+
+    @property
+    def area_label(self):
+        return format_context_label(self.area)
 
     def delete_artifacts(self):
         media_root = Path(settings.MEDIA_ROOT).resolve()

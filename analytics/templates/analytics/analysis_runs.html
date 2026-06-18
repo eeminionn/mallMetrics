@@ -69,8 +69,14 @@
         <article class="study-row">
           <div>
             <span class="analysis-status-overline status-{{ item.status }}">{{ item.get_status_display|lower }}</span>
-            <h2 class="analysis-title">{{ item.display_name }}</h2>
-            <p>{{ item.mall_name|default:"Sin mall" }} · {{ item.category|default:"General" }} · {{ item.area|default:"Sin sector" }}</p>
+            <div class="analysis-heading">
+              <h2 class="analysis-title">{{ item.display_name }}</h2>
+              <div class="analysis-context">
+                <span class="type-pill">{{ item.mall_label|default:"Sin mall" }}</span>
+                <span class="type-pill">{{ item.category_label|default:"General" }}</span>
+                <span class="type-pill">{{ item.area_label|default:"Sin sector" }}</span>
+              </div>
+            </div>
             <div class="analysis-meta">
               <details class="meta-popover">
                 <summary class="analysis-meta-item" title="Fecha del analisis">

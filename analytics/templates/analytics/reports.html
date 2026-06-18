@@ -7,7 +7,18 @@
   <div>
     <span class="eyebrow">Auditoria</span>
     <h1>Archivos del analisis</h1>
-    <p>{% if analysis %}{{ analysis.display_name }}{% else %}Ultimo analisis disponible{% endif %}</p>
+    {% if analysis %}
+      <div class="analysis-heading">
+        <strong class="analysis-title">{{ analysis.display_name }}</strong>
+        <div class="analysis-context">
+          <span class="type-pill">{{ analysis.mall_label|default:"Sin mall" }}</span>
+          <span class="type-pill">{{ analysis.category_label|default:"General" }}</span>
+          <span class="type-pill">{{ analysis.area_label|default:"Sin sector" }}</span>
+        </div>
+      </div>
+    {% else %}
+      <p>Ultimo analisis disponible</p>
+    {% endif %}
   </div>
   <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
 </header>

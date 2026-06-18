@@ -710,12 +710,42 @@
       @apply flex flex-wrap items-start justify-between gap-2.5;
     }
 
+    .study-card-head > div,
+    .study-row > div:first-child {
+      @apply min-w-0;
+    }
+
     .analysis-status-overline {
       @apply mb-1 block text-[10px] font-semibold lowercase tracking-[0.12em] text-muted;
     }
 
+    .analysis-heading {
+      @apply flex max-w-full flex-wrap items-end gap-x-2 gap-y-1;
+    }
+
     .analysis-title {
       @apply inline-block max-w-full border-b-2 border-signal pb-1 leading-tight text-copy;
+    }
+
+    .analysis-heading .analysis-title {
+      @apply min-w-0;
+    }
+
+    .analysis-context {
+      @apply mb-1 inline-flex max-w-full flex-wrap items-center gap-1.5;
+    }
+
+    .analysis-context .type-pill {
+      @apply bg-carbon text-[10px] normal-case tracking-normal text-muted;
+      min-height: 24px;
+    }
+
+    .analysis-page-heading {
+      @apply flex max-w-4xl flex-wrap items-end gap-x-3 gap-y-2;
+    }
+
+    .analysis-page-heading .analysis-context {
+      @apply mb-2;
     }
 
     .analysis-status-overline.status-running {

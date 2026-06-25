@@ -201,6 +201,20 @@
         <h2>Calidad del video</h2>
         <span>{{ video_quality.score }}/100 · {{ video_quality.label }}</span>
       </div>
+      <div class="actions enterprise-inline-actions">
+        {% if video_quality_refresh_enabled %}
+          <form method="post" action="{% url 'force_ai_video_quality' analysis.pk %}">
+            {% csrf_token %}
+            <button class="ghost-button" type="submit" title="{{ video_quality_refresh_reason }}">
+              <i data-lucide="sparkles"></i><span>Forzar revision IA</span>
+            </button>
+          </form>
+        {% else %}
+          <button class="ghost-button" type="button" disabled title="{{ video_quality_refresh_reason }}">
+            <i data-lucide="sparkles"></i><span>Revision IA vigente</span>
+          </button>
+        {% endif %}
+      </div>
       <div class="quality-meter" style="--quality-score: {{ video_quality.score }}%;"><span></span></div>
       <div class="analysis-meta">
         {% for check in video_quality.checks %}
@@ -369,6 +383,20 @@
         <span><i data-lucide="traffic-cone"></i> Friccion y simulador de layout</span>
         <i data-lucide="chevron-down"></i>
       </summary>
+      <div class="actions enterprise-inline-actions">
+        {% if layout_refresh_enabled %}
+          <form method="post" action="{% url 'force_ai_layout' analysis.pk %}">
+            {% csrf_token %}
+            <button class="ghost-button" type="submit" title="{{ layout_refresh_reason }}">
+              <i data-lucide="sparkles"></i><span>Forzar simulacion IA</span>
+            </button>
+          </form>
+        {% else %}
+          <button class="ghost-button" type="button" disabled title="{{ layout_refresh_reason }}">
+            <i data-lucide="sparkles"></i><span>Simulacion IA vigente</span>
+          </button>
+        {% endif %}
+      </div>
       {% if friction_rows %}
         <div class="table-wrap compact-table">
           <table>

@@ -46,6 +46,8 @@ REPORT_LABELS = {
 }
 
 AI_ANALYST_CACHE_KEY = "ai_analyst_v1"
+AI_VIDEO_QUALITY_CACHE_KEY = "ai_video_quality_v1"
+AI_LAYOUT_CACHE_KEY = "ai_layout_review_v1"
 
 METRIC_DICTIONARY = [
     {
@@ -743,8 +745,22 @@ def cached_ai_analyst_note(analysis):
     return InsightNote.objects.filter(analysis=analysis, insight_key=AI_ANALYST_CACHE_KEY).first()
 
 
+def cached_ai_note(analysis, cache_key):
+    return InsightNote.objects.filter(analysis=analysis, insight_key=cache_key).first()
+
+
 def cached_ai_analyst_payload(analysis):
-    cached = cached_ai_analyst_note(analysis)
+    cached = cached_ai_note(analysis, AI_ANALYST_CACHE_KEY)
+    if not cached:
+        return None, None
+    try:
+        return json.loads(cached.body), cached
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None, cached
+
+
+def cached_ai_payload(analysis, cache_key):
+    cached = cached_ai_note(analysis, cache_key)
     if not cached:
         return None, None
     try:
@@ -755,6 +771,11 @@ def cached_ai_analyst_payload(analysis):
 
 def has_fresh_ai_analyst(analysis):
     payload, cached = cached_ai_analyst_payload(analysis)
+    return bool(payload and cached and cached.updated_at >= analysis.updated_at)
+
+
+def has_fresh_ai_payload(analysis, cache_key):
+    payload, cached = cached_ai_payload(analysis, cache_key)
     return bool(payload and cached and cached.updated_at >= analysis.updated_at)
 
 
@@ -830,6 +851,154 @@ def request_openai_analyst(analysis, summary, insights, alerts, comparison, vide
     except (TypeError, ValueError, json.JSONDecodeError):
         return None
     parsed.update({"enabled": True, "source": "openai", "status": "Analisis generado por IA"})
+    return parsed
+
+
+def request_openai_json(api_key, model, schema_name, schema, instructions, payload, image_url=""):
+    content = [
+        {"type": "input_text", "text": instructions},
+        {"type": "input_text", "text": json.dumps(payload, ensure_ascii=False)},
+    ]
+    if image_url:
+        content.append({"type": "input_image", "image_url": image_url})
+
+    request_payload = {
+        "model": model,
+        "input": [{"role": "user", "content": content}],
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": schema_name,
+                "strict": True,
+                "schema": schema,
+            }
+        },
+    }
+    request = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(request_payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=24) as response:
+            body = response.read().decode("utf-8")
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError):
+        return None
+
+    try:
+        return json.loads(extract_response_text(json.loads(body)))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def openai_video_quality_schema():
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "video_quality_comment": {"type": "string"},
+            "video_improvement_actions": {"type": "array", "items": {"type": "string"}},
+            "confidence": {"type": "string"},
+        },
+        "required": ["video_quality_comment", "video_improvement_actions", "confidence"],
+    }
+
+
+def openai_layout_schema():
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "layout_recommendations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "title": {"type": "string"},
+                        "body": {"type": "string"},
+                        "impact": {"type": "string"},
+                    },
+                    "required": ["title", "body", "impact"],
+                },
+            },
+            "confidence": {"type": "string"},
+        },
+        "required": ["layout_recommendations", "confidence"],
+    }
+
+
+def request_openai_video_quality_review(analysis, video_quality):
+    api_key, model = openai_runtime_config()
+    if not api_key:
+        return None
+    payload = {
+        "analysis": {
+            "name": analysis.display_name,
+            "establishment": analysis.mall_label,
+            "category": analysis.category_label,
+            "area": analysis.area_label,
+        },
+        "video_quality": video_quality,
+        "zones": analysis.zones,
+        "frame_hint": "El frame adjunto corresponde al primer frame relevante del analisis.",
+    }
+    parsed = request_openai_json(
+        api_key,
+        model,
+        "peoplemetrics_video_quality",
+        openai_video_quality_schema(),
+        (
+            "Actua como especialista en vision computacional aplicada a analitica retail. "
+            "Evalua la calidad del video usando los metadatos y el frame adjunto. "
+            "Devuelve un comentario profesional y acciones concretas para mejorar captacion, iluminacion, angulo, enfoque y utilidad analitica."
+        ),
+        payload,
+        first_frame_data_url(analysis),
+    )
+    if not parsed:
+        return None
+    parsed.update({"enabled": True, "source": "openai"})
+    return parsed
+
+
+def request_openai_layout_review(analysis, friction_data, layout_scenarios, alerts):
+    api_key, model = openai_runtime_config()
+    if not api_key:
+        return None
+    payload = {
+        "analysis": {
+            "name": analysis.display_name,
+            "establishment": analysis.mall_label,
+            "category": analysis.category_label,
+            "area": analysis.area_label,
+        },
+        "zones": analysis.zones,
+        "friction": friction_data,
+        "baseline_layout_scenarios": layout_scenarios,
+        "alerts": alerts,
+        "frame_hint": "Usa el frame adjunto para inferir visibilidad, densidad espacial y posibles cuellos de botella.",
+    }
+    parsed = request_openai_json(
+        api_key,
+        model,
+        "peoplemetrics_layout_review",
+        openai_layout_schema(),
+        (
+            "Actua como analista senior de operaciones y layout. "
+            "Con base en friccion, zonas y el frame adjunto, propone ajustes concretos de layout, circulacion, espera, acceso y redistribucion. "
+            "No inventes precision; prioriza recomendaciones accionables para un analista."
+        ),
+        payload,
+        first_frame_data_url(analysis),
+    )
+    if not parsed:
+        return None
+    parsed.update({"enabled": True, "source": "openai"})
     return parsed
 
 
@@ -1359,6 +1528,15 @@ def dashboard_context(analysis=None, overview_analyses=None):
     scenarios = layout_scenario_rows(chart_payload["friction"])
     narrative = narrative_summary(analysis, summary, insights, alerts, comparison, video_quality)
     ai_analyst = ai_analyst_context(analysis, summary, insights, alerts, comparison, video_quality, scenarios)
+    video_ai_payload, _video_ai_note = cached_ai_payload(analysis, AI_VIDEO_QUALITY_CACHE_KEY)
+    if video_ai_payload and has_fresh_ai_payload(analysis, AI_VIDEO_QUALITY_CACHE_KEY):
+        ai_analyst["video_quality_comment"] = video_ai_payload.get("video_quality_comment", ai_analyst["video_quality_comment"])
+        ai_analyst["video_improvement_actions"] = video_ai_payload.get("video_improvement_actions", ai_analyst["video_improvement_actions"])
+        ai_analyst["source"] = video_ai_payload.get("source", ai_analyst["source"])
+    layout_ai_payload, _layout_ai_note = cached_ai_payload(analysis, AI_LAYOUT_CACHE_KEY)
+    if layout_ai_payload and has_fresh_ai_payload(analysis, AI_LAYOUT_CACHE_KEY):
+        ai_analyst["layout_recommendations"] = layout_ai_payload.get("layout_recommendations", ai_analyst["layout_recommendations"])
+        ai_analyst["source"] = layout_ai_payload.get("source", ai_analyst["source"])
     api_key, _model = openai_runtime_config()
     ai_analyst_refresh_enabled = bool(api_key) and not has_fresh_ai_analyst(analysis)
     if not api_key:
@@ -1367,6 +1545,20 @@ def dashboard_context(analysis=None, overview_analyses=None):
         ai_analyst_refresh_reason = "Este analisis ya tiene una respuesta IA vigente."
     else:
         ai_analyst_refresh_reason = "Genera o regenera la narrativa automatica con OpenAI."
+    video_quality_refresh_enabled = bool(api_key) and not has_fresh_ai_payload(analysis, AI_VIDEO_QUALITY_CACHE_KEY)
+    if not api_key:
+        video_quality_refresh_reason = "Configura tu API key de OpenAI para revisar este frame."
+    elif has_fresh_ai_payload(analysis, AI_VIDEO_QUALITY_CACHE_KEY):
+        video_quality_refresh_reason = "La revision de calidad IA ya esta vigente para este analisis."
+    else:
+        video_quality_refresh_reason = "Enviar frame y metadatos del video a OpenAI para evaluar calidad."
+    layout_refresh_enabled = bool(api_key) and not has_fresh_ai_payload(analysis, AI_LAYOUT_CACHE_KEY)
+    if not api_key:
+        layout_refresh_reason = "Configura tu API key de OpenAI para simular layout."
+    elif has_fresh_ai_payload(analysis, AI_LAYOUT_CACHE_KEY):
+        layout_refresh_reason = "La simulacion IA de layout ya esta vigente para este analisis."
+    else:
+        layout_refresh_reason = "Enviar frame, friccion y zonas a OpenAI para proponer layout."
     insight_notes = {
         note.insight_key: note
         for note in InsightNote.objects.filter(analysis=analysis)
@@ -1393,6 +1585,10 @@ def dashboard_context(analysis=None, overview_analyses=None):
         "ai_analyst": ai_analyst,
         "ai_analyst_refresh_enabled": ai_analyst_refresh_enabled,
         "ai_analyst_refresh_reason": ai_analyst_refresh_reason,
+        "video_quality_refresh_enabled": video_quality_refresh_enabled,
+        "video_quality_refresh_reason": video_quality_refresh_reason,
+        "layout_refresh_enabled": layout_refresh_enabled,
+        "layout_refresh_reason": layout_refresh_reason,
         "metric_dictionary": METRIC_DICTIONARY,
         "insight_notes": insight_notes,
         "zone_versions": analysis.zone_versions.select_related("created_by")[:6],

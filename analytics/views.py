@@ -26,6 +26,8 @@ from .forms import AppConfigurationForm, MallForm, VideoUploadForm
 from .models import AnalysisAuditLog, AnalysisRun, AppConfiguration, InsightNote, Mall, ZoneVersion
 from .services import (
     AI_ANALYST_CACHE_KEY,
+    AI_LAYOUT_CACHE_KEY,
+    AI_VIDEO_QUALITY_CACHE_KEY,
     build_analysis_zip_bytes,
     build_executive_pdf_bytes,
     build_executive_pptx_bytes,
@@ -33,15 +35,18 @@ from .services import (
     build_mall_executive_pdf_bytes,
     build_mall_executive_pptx_bytes,
     dashboard_context,
+    cached_ai_payload,
     has_fresh_ai_analyst,
+    has_fresh_ai_payload,
     openai_runtime_config,
     prepare_video_metadata,
+    request_openai_layout_review,
     request_openai_analyst,
+    request_openai_video_quality_review,
     reports_context,
     slug_token,
     build_summary,
     read_csv_dicts,
-    report_path,
     REPORT_FILES,
     ranking_rows,
     zone_activity_rows,
@@ -471,6 +476,84 @@ def force_ai_analyst(request, pk):
     )
     audit_event(request, AnalysisAuditLog.Action.NOTE_SAVE, analysis=analysis, mall=analysis.mall_group, insight_key="ai_analyst_force")
     messages.success(request, "Narrativa IA generada con OpenAI.")
+    return redirect("analysis_results", pk=analysis.pk)
+
+
+@login_required
+@require_POST
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR)
+def force_ai_video_quality(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    api_key, _model = openai_runtime_config()
+    if not api_key:
+        messages.error(request, "Configura una API key de OpenAI antes de revisar calidad con IA.")
+        return redirect("analysis_results", pk=analysis.pk)
+    if has_fresh_ai_payload(analysis, AI_VIDEO_QUALITY_CACHE_KEY):
+        messages.info(request, "La revision IA de calidad ya esta vigente.")
+        return redirect("analysis_results", pk=analysis.pk)
+
+    video_quality = video_quality_score(analysis)
+    generated = request_openai_video_quality_review(analysis, video_quality)
+    if not generated:
+        messages.error(request, "OpenAI no devolvio una revision valida de calidad. Revisa la API key, modelo o billing.")
+        return redirect("analysis_results", pk=analysis.pk)
+
+    previous, _cached = cached_ai_payload(analysis, AI_VIDEO_QUALITY_CACHE_KEY)
+    payload = {**(previous or {}), **generated}
+    InsightNote.objects.update_or_create(
+        analysis=analysis,
+        insight_key=AI_VIDEO_QUALITY_CACHE_KEY,
+        defaults={"body": json.dumps(payload, ensure_ascii=False), "created_by": request.user},
+    )
+    audit_event(request, AnalysisAuditLog.Action.NOTE_SAVE, analysis=analysis, mall=analysis.mall_group, insight_key="ai_video_quality_force")
+    messages.success(request, "Revision IA de calidad generada con el frame del analisis.")
+    return redirect("analysis_results", pk=analysis.pk)
+
+
+@login_required
+@require_POST
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR)
+def force_ai_layout(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    api_key, _model = openai_runtime_config()
+    if not api_key:
+        messages.error(request, "Configura una API key de OpenAI antes de simular layout con IA.")
+        return redirect("analysis_results", pk=analysis.pk)
+    if has_fresh_ai_payload(analysis, AI_LAYOUT_CACHE_KEY):
+        messages.info(request, "La simulacion IA de layout ya esta vigente.")
+        return redirect("analysis_results", pk=analysis.pk)
+
+    zone_rows = read_csv_dicts(REPORT_FILES["zones"], analysis)
+    zone_metric_rows = read_csv_dicts(REPORT_FILES["zone_metrics"], analysis)
+    store_rows = read_csv_dicts(REPORT_FILES["stores"], analysis)
+    time_rows = read_csv_dicts(REPORT_FILES["time_bins"], analysis)
+    event_rows = read_csv_dicts(REPORT_FILES["events"], analysis)
+    summary_rows = read_csv_dicts(REPORT_FILES["summary"], analysis)
+    summary = summary_rows[0] if summary_rows else build_summary(zone_rows)
+    chart_payload = {
+        "ranking": ranking_rows(store_rows, zone_metric_rows, zone_rows),
+        "time": time_series_rows(time_rows, analysis),
+        "friction": build_friction_rows(zone_metric_rows, zone_rows),
+        "trafficSurface": traffic_surface_payload(analysis, zone_rows, zone_metric_rows, time_rows, event_rows),
+    }
+    insights = operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event_rows)
+    video_quality = video_quality_score(analysis)
+    alerts = operational_alerts(analysis, summary, insights, chart_payload, zone_metric_rows, zone_rows, video_quality)
+    scenarios = layout_scenario_rows(chart_payload["friction"])
+    generated = request_openai_layout_review(analysis, chart_payload["friction"], scenarios, alerts)
+    if not generated:
+        messages.error(request, "OpenAI no devolvio una simulacion valida de layout. Revisa la API key, modelo o billing.")
+        return redirect("analysis_results", pk=analysis.pk)
+
+    previous, _cached = cached_ai_payload(analysis, AI_LAYOUT_CACHE_KEY)
+    payload = {**(previous or {}), **generated}
+    InsightNote.objects.update_or_create(
+        analysis=analysis,
+        insight_key=AI_LAYOUT_CACHE_KEY,
+        defaults={"body": json.dumps(payload, ensure_ascii=False), "created_by": request.user},
+    )
+    audit_event(request, AnalysisAuditLog.Action.NOTE_SAVE, analysis=analysis, mall=analysis.mall_group, insight_key="ai_layout_force")
+    messages.success(request, "Simulacion IA de layout generada con friccion, zonas y frame.")
     return redirect("analysis_results", pk=analysis.pk)
 
 

@@ -18,6 +18,7 @@ from config import (
     iou_value,
     model_name,
     parking_confidence,
+    parking_slot_entry_confirmation,
     parking_frame_stride,
     parking_slot_reconnect_seconds,
     parking_slot_miss_tolerance,
@@ -1072,6 +1073,9 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
             "current_session": None,
             "missed_frames": 0,
             "pending_session": None,
+            "present_frames": 0,
+            "candidate_arrival_seconds": None,
+            "candidate_arrival_frame": None,
         }
         for slot in slot_specs
     }
@@ -1087,24 +1091,41 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
     preview_max_width = 1440
     processing_started_at = time.perf_counter()
     time_bins = []
+    time_bin_map = {}
     current_bin = None
+
+    def make_time_bin(bin_start, zone_id):
+        return {
+            "start_seconds": bin_start,
+            "end_seconds": bin_start + time_bin_seconds,
+            "occupied_sum": 0.0,
+            "occupied_slots": 0,
+            "samples": 0,
+            "arrivals": 0,
+            "departures": 0,
+            "zone_id": zone_id,
+        }
+
+    def get_or_create_time_bin(bin_start, zone_id):
+        key = (bin_start, zone_id)
+        if key not in time_bin_map:
+            row = make_time_bin(bin_start, zone_id)
+            time_bin_map[key] = row
+            time_bins.append(row)
+        return time_bin_map[key]
 
     def ensure_time_bin(current_time):
         nonlocal current_bin
         bin_start = int(current_time // time_bin_seconds) * time_bin_seconds
+        zone_id = zones[0]["id"] if zones else ""
         if current_bin is None or current_bin["start_seconds"] != bin_start:
-            current_bin = {
-                "start_seconds": bin_start,
-                "end_seconds": bin_start + time_bin_seconds,
-                "occupied_sum": 0.0,
-                "occupied_slots": 0,
-                "samples": 0,
-                "arrivals": 0,
-                "departures": 0,
-                "zone_id": zones[0]["id"] if zones else "",
-            }
-            time_bins.append(current_bin)
+            current_bin = get_or_create_time_bin(bin_start, zone_id)
         return current_bin
+
+    def register_time_event(event_time, field_name, zone_id):
+        bin_start = int(event_time // time_bin_seconds) * time_bin_seconds
+        row = get_or_create_time_bin(bin_start, zone_id)
+        row[field_name] += 1
 
     update_analysis(analysis.pk, status_message="Analizando ocupacion de estacionamientos")
     while True:
@@ -1155,44 +1176,62 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
                 gap_seconds = max(0.0, current_time - pending_session["departure_seconds"])
                 if gap_seconds > max(1.0, float(parking_slot_reconnect_seconds)):
                     slot_sessions.append(pending_session)
+                    register_time_event(pending_session["departure_seconds"], "departures", slot["zone_id"])
                     state["pending_session"] = None
                     pending_session = None
             if matching:
                 det = max(matching, key=lambda item: item["conf"])
-                occupied_now.add(slot["slot_id"])
                 state["missed_frames"] = 0
+                state["present_frames"] += 1
+                if state["candidate_arrival_seconds"] is None:
+                    state["candidate_arrival_seconds"] = current_time
+                    state["candidate_arrival_frame"] = frame_count
                 if not state["occupied"]:
-                    state["occupied"] = True
-                    if pending_session is not None:
-                        state["current_session"] = pending_session
-                        state["current_session"]["departed"] = False
-                        state["current_session"].pop("departure_seconds", None)
-                        state["current_session"].pop("departure_frame", None)
-                        state["current_session"].pop("duration_seconds", None)
-                        state["pending_session"] = None
-                    else:
-                        arrivals += 1
-                        state["current_session"] = {
-                            "slot_id": slot["slot_id"],
-                            "zone_id": slot["zone_id"],
-                            "zone_name": slot["zone_name"],
-                            "arrival_seconds": current_time,
-                            "arrival_frame": frame_count,
-                            "x": round(det["cx"], 1),
-                            "y": round(det["cy"], 1),
-                            "departed": False,
-                        }
+                    ready_to_confirm = pending_session is not None or state["present_frames"] >= max(1, parking_slot_entry_confirmation)
+                    if ready_to_confirm:
+                        state["occupied"] = True
+                        occupied_now.add(slot["slot_id"])
+                        if pending_session is not None:
+                            state["current_session"] = pending_session
+                            state["current_session"]["departed"] = False
+                            state["current_session"].pop("departure_seconds", None)
+                            state["current_session"].pop("departure_frame", None)
+                            state["current_session"].pop("duration_seconds", None)
+                            state["pending_session"] = None
+                        else:
+                            arrival_seconds = state["candidate_arrival_seconds"] if state["candidate_arrival_seconds"] is not None else current_time
+                            arrival_frame = state["candidate_arrival_frame"] if state["candidate_arrival_frame"] is not None else frame_count
+                            arrivals += 1
+                            register_time_event(arrival_seconds, "arrivals", slot["zone_id"])
+                            state["current_session"] = {
+                                "slot_id": slot["slot_id"],
+                                "zone_id": slot["zone_id"],
+                                "zone_name": slot["zone_name"],
+                                "arrival_seconds": arrival_seconds,
+                                "arrival_frame": arrival_frame,
+                                "x": round(det["cx"], 1),
+                                "y": round(det["cy"], 1),
+                                "departed": False,
+                            }
+                        state["candidate_arrival_seconds"] = None
+                        state["candidate_arrival_frame"] = None
                 elif state["current_session"] is not None:
+                    occupied_now.add(slot["slot_id"])
                     state["current_session"]["x"] = round(det["cx"], 1)
                     state["current_session"]["y"] = round(det["cy"], 1)
-                overlay_color = (96, 165, 250)
-                cv2.rectangle(frame, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), overlay_color, 2)
-                cv2.rectangle(heatmap, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), 1.0, -1)
+                if state["occupied"]:
+                    overlay_color = (96, 165, 250)
+                    cv2.rectangle(frame, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), overlay_color, 2)
+                    cv2.rectangle(heatmap, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), 1.0, -1)
+                else:
+                    cv2.rectangle(frame, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), (120, 130, 150), 1)
             else:
+                state["present_frames"] = 0
+                state["candidate_arrival_seconds"] = None
+                state["candidate_arrival_frame"] = None
                 if state["occupied"]:
                     state["missed_frames"] += 1
                 if state["occupied"] and state["current_session"] is not None and state["missed_frames"] >= max(1, parking_slot_miss_tolerance):
-                    departures += 1
                     session = state["current_session"]
                     session["departure_seconds"] = current_time
                     session["departure_frame"] = frame_count
@@ -1213,8 +1252,6 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
         bin_row["occupied_sum"] += occupied_count
         bin_row["occupied_slots"] = occupied_count
         bin_row["samples"] += 1
-        bin_row["arrivals"] += arrivals
-        bin_row["departures"] += departures
 
         for zone in zones:
             cv2.putText(
@@ -1257,6 +1294,7 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
     final_time = frame_count / fps if fps else 0
     for state in slot_state.values():
         if state["pending_session"] is not None:
+            register_time_event(state["pending_session"]["departure_seconds"], "departures", state["pending_session"]["zone_id"])
             slot_sessions.append(state["pending_session"])
         if state["occupied"] and state["current_session"] is not None:
             session = state["current_session"]
@@ -1270,6 +1308,7 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
         fail_analysis(analysis.pk, "No se pudo generar un frame representativo del estacionamiento.")
         return
 
+    time_bins.sort(key=lambda row: (row["start_seconds"], row["zone_id"]))
     update_analysis(analysis.pk, progress=99, status_message="Generando heatmap y reportes de estacionamiento")
     final_image = vision_utils.generate_final_heatmap(best_frame, heatmap, zones, {zone["id"]: peak_occupied_slots for zone in zones})
     cv2.imwrite(str(output_dir / heatmap_output_file), final_image)

@@ -29,6 +29,9 @@ display_every_n_frames = 2
 # En estacionamientos no hace falta analizar cada frame para medir ocupacion.
 parking_frame_stride = 4
 
+# Confirmaciones minimas para transformar una deteccion en llegada o salida valida.
+parking_slot_entry_confirmation = 2
+
 # Cantidad de frames procesados consecutivos sin deteccion antes de cerrar una sesion.
 parking_slot_miss_tolerance = 3
 

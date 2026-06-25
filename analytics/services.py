@@ -638,10 +638,39 @@ def layout_scenario_rows(friction_data):
     return scenarios
 
 
+def analysis_terms(analysis):
+    if getattr(analysis, "is_parking", False):
+        return {
+            "entities_plural": "vehiculos",
+            "entities_validated": "vehiculos validados",
+            "entries": "llegadas a casillas",
+            "busiest_zone": "zona con mayor ocupacion",
+            "peak_metric": "maximo de slots ocupados",
+            "peak_operation": "peak de ocupacion",
+            "quiet_operation": "horario de menor ocupacion",
+            "layout_scope": "layout de estacionamiento, circulacion vehicular, maniobras y rotacion de casillas",
+            "video_subjects": "vehiculos en vista cenital tipo YOLO",
+            "frame_comment": "Mantén casillas, accesos y maniobras claramente visibles dentro del encuadre.",
+        }
+    return {
+        "entities_plural": "personas",
+        "entities_validated": "personas validadas",
+        "entries": "entradas a zonas",
+        "busiest_zone": "zona mas transitada",
+        "peak_metric": "maximo de personas",
+        "peak_operation": "peak operativo",
+        "quiet_operation": "horario minimo",
+        "layout_scope": "layout, circulacion, espera, acceso y redistribucion",
+        "video_subjects": "personas tipo YOLO",
+        "frame_comment": "Mantén personas completas dentro del encuadre en las zonas criticas.",
+    }
+
+
 def narrative_summary(analysis, summary, insights, alerts, comparison, video_quality):
+    terms = analysis_terms(analysis)
     lines = [
-        f"El analisis {analysis.display_name} muestra {summary.get('total_people', '-')} personas validadas y {summary.get('total_zone_entries', '0')} entradas a zonas.",
-        f"La zona dominante es {insights['busiest_zone']['label']} y el peak se observa en {insights['peak_time']['label']}.",
+        f"El analisis {analysis.display_name} muestra {summary.get('total_people', '-')} {terms['entities_validated']} y {summary.get('total_zone_entries', '0')} {terms['entries']}.",
+        f"La {terms['busiest_zone']} es {insights['busiest_zone']['label']} y el {terms['peak_operation']} se observa en {insights['peak_time']['label']}.",
         f"La calidad tecnica del video queda en {video_quality['score']}/100 ({video_quality['label']}).",
     ]
     if alerts:
@@ -651,18 +680,18 @@ def narrative_summary(analysis, summary, insights, alerts, comparison, video_qua
     return lines
 
 
-def local_ai_analyst(summary, insights, alerts, layout_scenarios, video_quality):
+def local_ai_analyst(analysis, summary, insights, alerts, layout_scenarios, video_quality):
     return {
         "enabled": False,
         "source": "local",
         "status": "Configura OPENAI_API_KEY para activar analista IA.",
-        "narrative": narrative_summary_placeholder(summary, insights, alerts, video_quality),
+        "narrative": narrative_summary_placeholder(summary, insights, alerts, video_quality, analysis),
         "layout_recommendations": layout_scenarios,
         "video_quality_comment": video_quality["visual"]["comment"],
         "video_improvement_actions": [
             "Usa un plano fijo con buena iluminacion frontal.",
             "Evita contraluces, reflejos fuertes y camara en movimiento.",
-            "Mantén personas completas dentro del encuadre en las zonas criticas.",
+            "Mantén el area operativa completa y claramente visible dentro del encuadre.",
         ],
         "video_quality_score": video_quality["score"],
         "video_quality_label": video_quality["label"],
@@ -670,10 +699,11 @@ def local_ai_analyst(summary, insights, alerts, layout_scenarios, video_quality)
     }
 
 
-def narrative_summary_placeholder(summary, insights, alerts, video_quality):
+def narrative_summary_placeholder(summary, insights, alerts, video_quality, analysis=None):
+    terms = analysis_terms(analysis)
     lines = [
-        f"Se detectan {summary.get('total_people', '-')} personas validadas y {summary.get('total_zone_entries', '0')} entradas a zonas.",
-        f"El foco principal esta en {insights['busiest_zone']['label']} y el peak operativo aparece cerca de {insights['peak_time']['label']}.",
+        f"Se detectan {summary.get('total_people', '-')} {terms['entities_validated']} y {summary.get('total_zone_entries', '0')} {terms['entries']}.",
+        f"El foco principal esta en {insights['busiest_zone']['label']} y el {terms['peak_operation']} aparece cerca de {insights['peak_time']['label']}.",
         f"La calidad visual queda en {video_quality['score']}/100 ({video_quality['label']}): {video_quality['visual']['comment']}",
     ]
     if alerts:
@@ -797,6 +827,7 @@ def request_openai_analyst(analysis, summary, insights, alerts, comparison, vide
     api_key, model = openai_runtime_config()
     if not api_key:
         return None
+    terms = analysis_terms(analysis)
 
     payload = {
         "analysis": {
@@ -823,7 +854,7 @@ def request_openai_analyst(analysis, summary, insights, alerts, comparison, vide
             "type": "input_text",
             "text": (
                 "Actua como analista senior de datos y operaciones. Devuelve hallazgos accionables, "
-                "recomendaciones de layout y comentarios de calidad de video basados solo en esta evidencia. "
+                f"recomendaciones de {terms['layout_scope']} y comentarios de calidad de video basados solo en esta evidencia. "
                 "Evita exagerar certeza si los datos son escasos."
             ),
         },
@@ -953,6 +984,7 @@ def request_openai_video_quality_review(analysis, video_quality):
     api_key, model = openai_runtime_config()
     if not api_key:
         return None
+    terms = analysis_terms(analysis)
     payload = {
         "analysis": {
             "name": analysis.display_name,
@@ -971,7 +1003,7 @@ def request_openai_video_quality_review(analysis, video_quality):
         openai_video_quality_schema(),
         (
             "Actua como especialista en vision computacional aplicada a analitica retail. "
-            "Evalua la calidad del video usando los metadatos y el frame adjunto con criterio exigente para deteccion de personas tipo YOLO. "
+            f"Evalua la calidad del video usando los metadatos y el frame adjunto con criterio exigente para deteccion de {terms['video_subjects']}. "
             "Puntua oclusiones, blur, contraste, iluminacion, angulo, distancia a sujetos, ruido, reflejos y valor real para computer vision. "
             "No entregues 100/100 salvo condiciones casi perfectas de laboratorio; ante dudas castiga el score. "
             "Devuelve score 0-100, una etiqueta corta, un comentario profesional y acciones concretas para mejorar captacion, iluminacion, angulo, enfoque y utilidad analitica."
@@ -989,6 +1021,7 @@ def request_openai_layout_review(analysis, friction_data, layout_scenarios, aler
     api_key, model = openai_runtime_config()
     if not api_key:
         return None
+    terms = analysis_terms(analysis)
     payload = {
         "analysis": {
             "name": analysis.display_name,
@@ -1009,7 +1042,7 @@ def request_openai_layout_review(analysis, friction_data, layout_scenarios, aler
         openai_layout_schema(),
         (
             "Actua como analista senior de operaciones y layout. "
-            "Con base en friccion, zonas y el frame adjunto, propone ajustes concretos de layout, circulacion, espera, acceso y redistribucion. "
+            f"Con base en friccion, zonas y el frame adjunto, propone ajustes concretos de {terms['layout_scope']}. "
             "Para cada recomendacion devuelve un porcentaje entero de reduccion estimada de friccion (impact_pct) distinto segun la evidencia; evita repetir siempre el mismo valor. "
             "No inventes precision excesiva; prioriza recomendaciones accionables para un analista."
         ),
@@ -1023,7 +1056,7 @@ def request_openai_layout_review(analysis, friction_data, layout_scenarios, aler
 
 
 def ai_analyst_context(analysis, summary, insights, alerts, comparison, video_quality, layout_scenarios):
-    fallback = local_ai_analyst(summary, insights, alerts, layout_scenarios, video_quality)
+    fallback = local_ai_analyst(analysis, summary, insights, alerts, layout_scenarios, video_quality)
     api_key, _model = openai_runtime_config()
     if not api_key:
         return fallback
@@ -1048,6 +1081,7 @@ def ai_analyst_context(analysis, summary, insights, alerts, comparison, video_qu
 
 def operational_alerts(analysis, summary, insights, chart_payload, zone_metric_rows, zone_rows, video_quality):
     alerts = []
+    terms = analysis_terms(analysis)
     total_entries = safe_int(summary.get("total_zone_entries"))
     total_people = safe_int(summary.get("total_people"))
     max_people = safe_int(insights["max_people"]["value"])
@@ -1075,7 +1109,7 @@ def operational_alerts(analysis, summary, insights, chart_payload, zone_metric_r
         alerts.append({
             "level": "high",
             "title": "Sobreocupacion relativa",
-            "body": f"El maximo simultaneo llega a {max_people} personas, alto frente al total validado del video.",
+            "body": f"El maximo simultaneo llega a {max_people} {terms['entities_plural']}, alto frente al total validado del video.",
         })
     if total_entries and safe_int(busiest["value"]) >= total_entries * 0.45:
         alerts.append({
@@ -1301,6 +1335,7 @@ def executive_report_lines(analysis):
     insights = context["operational_insights"]
     quality = context["video_quality"]
     alerts = context["operational_alerts"]
+    terms = analysis_terms(analysis)
     lines = [
         f"PIPOLMETRICS - Reporte ejecutivo",
         f"Analisis: {analysis.display_name}",
@@ -1309,14 +1344,14 @@ def executive_report_lines(analysis):
         f"Zona o sector: {analysis.area_label or 'Sin sector'}",
         "",
         "Resumen",
-        f"Personas validadas: {summary.get('total_people', '-')}",
-        f"Entradas a zonas: {summary.get('total_zone_entries', '0')}",
+        f"{terms['entities_validated'].capitalize()}: {summary.get('total_people', '-')}",
+        f"{terms['entries'].capitalize()}: {summary.get('total_zone_entries', '0')}",
         f"Actividad focal: {summary.get('total_focus_activity', summary.get('total_zone_entries', '0'))}",
         f"Permanencia promedio: {summary.get('avg_dwell_time', '-')}",
         "",
         "Highlights",
-        f"Zona mas transitada: {insights['busiest_zone']['label']} ({insights['busiest_zone']['value']} eventos)",
-        f"Maximo de personas: {insights['max_people']['value']} ({insights['max_people']['label']})",
+        f"{terms['busiest_zone'].capitalize()}: {insights['busiest_zone']['label']} ({insights['busiest_zone']['value']} eventos)",
+        f"{terms['peak_metric'].capitalize()}: {insights['max_people']['value']} ({insights['max_people']['label']})",
         f"Horario peak: {insights['peak_time']['label']} ({insights['peak_time']['value']} eventos)",
         f"Horario minimo: {insights['quiet_time']['label']} ({insights['quiet_time']['value']} eventos)",
         f"Calidad de video: {quality['score']}/100 - {quality['label']}",
@@ -1333,7 +1368,7 @@ def executive_report_lines(analysis):
             "",
             "Comparacion",
             f"Base anterior: {comparison['analysis'].display_name}",
-            f"Personas: {comparison['people']['current']} vs {comparison['people']['previous']} ({comparison['people']['absolute']:+d})",
+            f"{terms['entities_plural'].capitalize()}: {comparison['people']['current']} vs {comparison['people']['previous']} ({comparison['people']['absolute']:+d})",
             f"Entradas: {comparison['entries']['current']} vs {comparison['entries']['previous']} ({comparison['entries']['absolute']:+d})",
         ])
     return lines

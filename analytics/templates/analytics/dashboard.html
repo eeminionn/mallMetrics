@@ -266,7 +266,7 @@
       {% if analysis_comparison %}
         <div class="mini-kpi-grid">
           <article class="mini-kpi">
-            <span>Personas</span>
+            <span>{% if analysis.is_parking %}Vehiculos{% else %}Personas{% endif %}</span>
             <strong>{{ analysis_comparison.people.absolute|default:"0" }}</strong>
             <small>{{ analysis_comparison.people.previous }} anterior · {{ analysis_comparison.people.current }} actual</small>
           </article>
@@ -347,7 +347,7 @@
   <section class="enterprise-grid">
     <details class="enterprise-panel" open>
       <summary>
-        <span><i data-lucide="sparkles"></i> Narrativa automatica y notas</span>
+        <span><i data-lucide="sparkles"></i> {% if analysis.is_parking %}Narrativa automatica y notas de estacionamiento{% else %}Narrativa automatica y notas{% endif %}</span>
         <small>{{ ai_analyst.status }}</small>
         <i data-lucide="chevron-down"></i>
       </summary>
@@ -374,14 +374,14 @@
         {% csrf_token %}
         <input type="hidden" name="insight_key" value="executive_summary">
         <label for="executiveNote">Interpretacion del analista</label>
-        <textarea id="executiveNote" name="body" placeholder="Ej: el peak coincide con cambio de turno o apertura de cajas">{{ insight_notes.executive_summary.body }}</textarea>
+        <textarea id="executiveNote" name="body" placeholder="{% if analysis.is_parking %}Ej: el peak coincide con salida de oficina o baja rotacion en el sector norte{% else %}Ej: el peak coincide con cambio de turno o apertura de cajas{% endif %}">{{ insight_notes.executive_summary.body }}</textarea>
         <button class="ghost-button" type="submit"><i data-lucide="message-square-plus"></i><span>Guardar nota</span></button>
       </form>
     </details>
 
     <details class="enterprise-panel" open>
       <summary>
-        <span><i data-lucide="traffic-cone"></i> Friccion y simulador de layout</span>
+        <span><i data-lucide="traffic-cone"></i> {% if analysis.is_parking %}Rotacion y simulador de layout vehicular{% else %}Friccion y simulador de layout{% endif %}</span>
         <i data-lucide="chevron-down"></i>
       </summary>
       <div class="actions enterprise-inline-actions">

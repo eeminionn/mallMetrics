@@ -40,7 +40,21 @@
     {{ form.area }}
     {{ form.area.errors }}
     <label for="{{ form.video.id_for_label }}">Archivo de video</label>
-    {{ form.video }}
+    <div class="file-upload-grid">
+      <div class="file-picker-field">
+        {{ form.video }}
+        <label class="file-select-card" for="{{ form.video.id_for_label }}">
+          <i data-lucide="file-video"></i>
+          <span>Seleccionar archivo</span>
+          <small id="videoSelectName">Ningun video seleccionado</small>
+        </label>
+      </div>
+      <label id="videoDropZone" class="drop-upload-card" for="{{ form.video.id_for_label }}">
+        <i data-lucide="upload-cloud"></i>
+        <strong>Arrastra y suelta</strong>
+        <span id="videoFileName">o selecciona un video</span>
+      </label>
+    </div>
     {{ form.video.errors }}
     <button class="primary-button full" type="submit"><i data-lucide="arrow-right"></i><span>Continuar a zonas</span></button>
   </form>
@@ -55,4 +69,50 @@
     </ul>
   </aside>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (() => {
+    const input = document.getElementById("{{ form.video.id_for_label }}");
+    const dropZone = document.getElementById("videoDropZone");
+    const fileName = document.getElementById("videoFileName");
+    const selectName = document.getElementById("videoSelectName");
+    if (!input || !dropZone || !fileName || !selectName) return;
+
+    const updateFileName = () => {
+      const name = input.files?.[0]?.name || "";
+      fileName.textContent = name || "o selecciona un video";
+      selectName.textContent = name || "Ningun video seleccionado";
+    };
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.add("is-dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      dropZone.addEventListener(eventName, () => {
+        dropZone.classList.remove("is-dragover");
+      });
+    });
+
+    dropZone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      if (!event.dataTransfer?.files?.length) return;
+      input.files = event.dataTransfer.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      updateFileName();
+    });
+
+    document.addEventListener("dragover", (event) => event.preventDefault());
+    document.addEventListener("drop", (event) => {
+      if (!dropZone.contains(event.target)) event.preventDefault();
+    });
+    input.addEventListener("change", updateFileName);
+    updateFileName();
+  })();
+</script>
 {% endblock %}

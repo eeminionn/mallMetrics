@@ -470,6 +470,57 @@
       @apply p-6;
     }
 
+    .file-upload-grid {
+      @apply grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.75fr)];
+    }
+
+    .file-picker-field {
+      @apply grid;
+    }
+
+    .file-picker-field input[type="file"] {
+      @apply sr-only;
+    }
+
+    .file-select-card {
+      @apply m-0 grid min-h-24 cursor-pointer place-items-center gap-1.5 rounded-lg border border-signal bg-transparent px-4 py-4 text-center text-sm font-semibold normal-case tracking-normal text-copy transition hover:bg-signal/10;
+    }
+
+    .file-select-card svg {
+      @apply text-signal;
+    }
+
+    .file-select-card span,
+    .file-select-card small {
+      @apply block;
+    }
+
+    .file-select-card small {
+      @apply max-w-full truncate text-xs font-medium text-muted;
+    }
+
+    .drop-upload-card {
+      @apply grid min-h-24 cursor-pointer place-items-center gap-1.5 rounded-lg border border-dashed border-line bg-carbon px-4 py-4 text-center text-sm font-semibold text-muted transition hover:border-signal hover:bg-panel-2 hover:text-copy;
+    }
+
+    .drop-upload-card svg {
+      @apply text-signal;
+    }
+
+    .drop-upload-card strong,
+    .drop-upload-card span {
+      @apply block;
+    }
+
+    .drop-upload-card span {
+      @apply max-w-full truncate text-xs font-medium text-quiet;
+    }
+
+    .drop-upload-card.is-dragover {
+      @apply border-signal bg-panel-2 text-copy;
+      box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.28);
+    }
+
     .panel-heading h2 {
       @apply mb-1 text-2xl font-semibold;
     }

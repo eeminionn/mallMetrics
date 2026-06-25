@@ -19,6 +19,7 @@ class VideoUploadForm(forms.ModelForm):
             "mall": forms.TextInput(attrs={"placeholder": "Ej: Edificio Central"}),
             "category": forms.TextInput(attrs={"placeholder": "Ej: Accesos / Salas / Operacion"}),
             "area": forms.TextInput(attrs={"placeholder": "Ej: Piso 2 - Ala oriente"}),
+            "video": forms.FileInput(attrs={"accept": "video/*"}),
         }
 
     def clean_video(self):

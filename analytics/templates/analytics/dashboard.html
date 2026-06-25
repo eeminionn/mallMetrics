@@ -1,6 +1,6 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Resultados | People Metrics{% endblock %}
+{% block title %}Resultados | PIPOLMETRICS{% endblock %}
 
 {% block content %}
 {% if dashboard_mode == "overview" %}
@@ -50,7 +50,7 @@
                 <div class="mini-kpi-grid">
                   <article class="mini-kpi"><span>Personas</span><strong>{{ card.total_people }}</strong></article>
                   <article class="mini-kpi"><span>Entradas zona</span><strong>{{ card.total_zone_entries }}</strong></article>
-                  <article class="mini-kpi"><span>Entradas tienda</span><strong>{{ card.total_store_entries }}</strong></article>
+                  <article class="mini-kpi"><span>Actividad zona</span><strong>{{ card.total_focus_activity }}</strong></article>
                   <article class="mini-kpi"><span>Permanencia</span><strong>{{ card.avg_dwell_label }}</strong></article>
                 </div>
 
@@ -64,7 +64,7 @@
                       {% for snapshot in card.recent_snapshots %}
                         <article class="study-row compact">
                           <div>
-                            <span class="analysis-status-overline status-{{ snapshot.analysis.status }}">{{ snapshot.analysis.get_status_display|lower }}</span>
+                            <span class="analysis-status-overline status-{{ snapshot.analysis.status }}">{{ snapshot.analysis.get_status_display|upper }}</span>
                             <div class="analysis-heading">
                               <h2 class="analysis-title">{{ snapshot.analysis.display_name }}</h2>
                               <div class="analysis-context">
@@ -72,24 +72,18 @@
                                 <span class="type-pill">{{ snapshot.analysis.area_label|default:"Sin sector" }}</span>
                               </div>
                             </div>
-                            <div class="analysis-meta">
-                              <details class="meta-popover">
-                                <summary class="analysis-meta-item" title="Fecha del analisis">
-                                  <i data-lucide="calendar-days"></i>
-                                  <strong>{{ snapshot.analysis.created_at|date:"d" }}</strong>
-                                </summary>
-                                <div class="meta-popover-panel">
-                                  <strong>{{ snapshot.analysis.created_at|date:"d/m/Y" }}</strong><br>
-                                  {{ snapshot.analysis.created_at|date:"H:i" }} hrs
-                                </div>
-                              </details>
-                              <span class="analysis-meta-item"><i data-lucide="video"></i><strong>{{ snapshot.analysis.total_frames }}</strong> frames</span>
-                              <span class="analysis-meta-item"><i data-lucide="scan"></i><strong>{{ snapshot.analysis.frame_width }}x{{ snapshot.analysis.frame_height }}</strong></span>
-                            </div>
+                            <details class="analysis-detail-toggle">
+                              <summary><i data-lucide="info"></i><span>Mas detalle</span></summary>
+                              <div class="analysis-meta">
+                                <span class="analysis-meta-item"><i data-lucide="calendar-days"></i><strong>{{ snapshot.analysis.created_at|date:"d/m" }}</strong></span>
+                                <span class="analysis-meta-item"><i data-lucide="video"></i><strong>{{ snapshot.analysis.total_frames }}</strong> frames</span>
+                                <span class="analysis-meta-item"><i data-lucide="scan"></i><strong>{{ snapshot.analysis.frame_width }}x{{ snapshot.analysis.frame_height }}</strong></span>
+                              </div>
+                            </details>
                           </div>
                           <div class="study-actions">
                             <nav class="analysis-tabs" aria-label="Acciones del analisis">
-                              <a class="analysis-tab" href="{% url 'analysis_status' snapshot.analysis.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+                              <a class="analysis-tab" href="{% url 'download_analysis_report' snapshot.analysis.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
                               <a class="analysis-tab is-emphasis" href="{% url 'analysis_results' snapshot.analysis.pk %}"><i data-lucide="bar-chart-3"></i><span>Ver resultado</span></a>
                             </nav>
                           </div>
@@ -134,7 +128,7 @@
       <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
       <nav class="analysis-tabs" aria-label="Acciones del analisis">
         <a class="analysis-tab" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
-        <a class="analysis-tab" href="{% url 'analysis_status' analysis.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+        <a class="analysis-tab" href="{% url 'download_analysis_report' analysis.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
         <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
       </nav>
       <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
@@ -153,9 +147,9 @@
       <small>Cruces con permanencia minima</small>
     </article>
     <article class="kpi kpi-amber">
-      <span>Ingresos tienda</span>
-      <strong>{{ summary.total_store_entries|default:"0" }}</strong>
-      <small>Estimacion por puertas</small>
+      <span>Actividad focal</span>
+      <strong>{{ summary.total_focus_activity|default:summary.total_zone_entries|default:"0" }}</strong>
+      <small>Interacciones acumuladas en zonas</small>
     </article>
     <article class="kpi kpi-rose">
       <span>Permanencia prom.</span>
@@ -165,6 +159,19 @@
   </section>
 
   <section class="analysis-grid">
+    <article class="panel result-video-panel">
+      <div class="panel-title">
+        <h2>Video analizado</h2>
+        <span>{{ analysis.frame_width }}x{{ analysis.frame_height }}</span>
+      </div>
+      <div class="preview-shell media-shell">
+        <video controls preload="metadata" class="analysis-video-player">
+          <source src="{{ analysis.video.url }}">
+          Tu navegador no puede reproducir este video.
+        </video>
+      </div>
+    </article>
+
     <article class="panel heatmap-panel">
       <div class="panel-title">
         <h2>Mapa de calor</h2>
@@ -190,13 +197,16 @@
       <canvas id="timeChart" height="250"></canvas>
     </article>
 
-    <article class="panel">
-      <div class="panel-title"><h2>Distribucion por tienda</h2></div>
-      <canvas id="storeChart" height="250"></canvas>
+    <article class="panel zone-3d-panel">
+      <div class="panel-title">
+        <h2>Mapa 3D de zonas</h2>
+        <span>Interactivo</span>
+      </div>
+      <div id="zone3dChart" class="plotly-panel"></div>
     </article>
 
     <article class="panel">
-      <div class="panel-title"><h2>Escaleras</h2></div>
+      <div class="panel-title"><h2>Direccionalidad</h2></div>
       <canvas id="stairsChart" height="250"></canvas>
     </article>
   </section>
@@ -243,6 +253,7 @@
 {% block scripts %}
 {% if dashboard_mode == "analysis" %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <script>
   const chartData = {{ chart_payload|safe }};
   const palette = ["#2563eb", "#F4F7F5", "#D6FF72", "#FF5F7A", "#38bdf8", "#93C5FD", "#8CA4C8", "#E6F0FF"];
@@ -279,15 +290,35 @@
     });
   }
 
-  if (hasRows(chartData.storeFlow)) {
-    new Chart(document.getElementById("storeChart"), {
-      type: "doughnut",
-      data: {
-        labels: chartData.storeFlow.map(row => row.label),
-        datasets: [{ data: chartData.storeFlow.map(row => row.value), backgroundColor: palette, borderWidth: 0 }]
+  if (window.Plotly && hasRows(chartData.spatialZones)) {
+    Plotly.newPlot("zone3dChart", [{
+      type: "scatter3d",
+      mode: "markers+text",
+      x: chartData.spatialZones.map(row => row.x),
+      y: chartData.spatialZones.map(row => row.y),
+      z: chartData.spatialZones.map(row => row.entries || row.unique || 0),
+      text: chartData.spatialZones.map(row => row.label),
+      textposition: "top center",
+      marker: {
+        size: chartData.spatialZones.map(row => Math.max(7, Math.min(26, Math.sqrt(row.area || 1) / 12))),
+        color: chartData.spatialZones.map(row => row.entries || row.unique || 0),
+        colorscale: [[0, "#1d4ed8"], [0.5, "#38bdf8"], [1, "#d6ff72"]],
+        opacity: 0.88,
+        colorbar: { title: "Eventos" }
       },
-      options: { responsive: true, cutout: "62%", plugins: { legend: { position: "bottom" } } }
-    });
+      hovertemplate: "<b>%{text}</b><br>X: %{x}<br>Y: %{y}<br>Eventos: %{z}<extra></extra>"
+    }], {
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(0,0,0,0)",
+      margin: { l: 0, r: 0, b: 0, t: 0 },
+      scene: {
+        xaxis: { title: "X frame", color: "#A8B6D6", gridcolor: "#1e3a5f" },
+        yaxis: { title: "Y frame", color: "#A8B6D6", gridcolor: "#1e3a5f" },
+        zaxis: { title: "Actividad", color: "#A8B6D6", gridcolor: "#1e3a5f" },
+        camera: { eye: { x: 1.55, y: 1.45, z: 1.15 } }
+      },
+      font: { color: "#f8fbff", family: "Inter, sans-serif" }
+    }, { responsive: true, displaylogo: false });
   }
 
   if (hasRows(chartData.stairs)) {

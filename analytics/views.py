@@ -3,7 +3,7 @@ import threading
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -14,7 +14,14 @@ from config import ZONE_STYLES
 from .analysis_engine import run_analysis_job
 from .forms import MallForm, VideoUploadForm
 from .models import AnalysisRun, Mall
-from .services import dashboard_context, prepare_video_metadata
+from .services import (
+    build_analysis_zip_bytes,
+    build_mall_zip_bytes,
+    dashboard_context,
+    prepare_video_metadata,
+    reports_context,
+    slug_token,
+)
 
 
 def clamp_point(point, frame_width, frame_height):
@@ -104,15 +111,12 @@ def board_columns(analyses):
     columns = []
     all_establecimientos = list(Mall.objects.all())
     analyses_by_mall = {establecimiento.id: [] for establecimiento in all_establecimientos}
-    unassigned = []
 
     for analysis in analyses:
         if analysis.mall_group_id and analysis.mall_group_id in analyses_by_mall:
             analyses_by_mall[analysis.mall_group_id].append(analysis)
-        else:
-            unassigned.append(analysis)
 
-    for establecimiento in all_establecimientos:
+    for establecimiento in sorted(all_establecimientos, key=lambda mall: len(analyses_by_mall[mall.id]), reverse=True):
         columns.append({
             "id": str(establecimiento.id),
             "name": establecimiento.name,
@@ -122,14 +126,6 @@ def board_columns(analyses):
             "items": analyses_by_mall[establecimiento.id],
         })
 
-    columns.append({
-        "id": "",
-        "name": "Sin establecimiento asignado",
-        "accent_color": "#475569",
-        "notes": "",
-        "count": len(unassigned),
-        "items": unassigned,
-    })
     return columns
 
 
@@ -149,6 +145,7 @@ def mall_board(request):
     return render(request, "analytics/analysis_list.html", {
         "analyses": analyses,
         "board_columns": board_columns(analyses),
+        "available_analyses": analyses.filter(mall_group__isnull=True).order_by("-created_at"),
         "category_options": category_options,
         "selected_category": selected_category,
         "mall_form": MallForm(initial={"accent_color": "#2563EB"}),
@@ -231,7 +228,7 @@ def zone_editor(request, pk):
     zone_styles = {
         key: {"label": value["label"], "hex": value["hex"]}
         for key, value in ZONE_STYLES.items()
-        if key in {"puerta", "frente_tienda", "escalera", "salida", "zona"}
+        if key in {"zona"}
     }
     return render(request, "analytics/zone_editor.html", {
         "analysis": analysis,
@@ -255,7 +252,23 @@ def analysis_results(request, pk):
 @login_required
 def reports(request, pk=None):
     analysis = get_object_or_404(AnalysisRun, pk=pk) if pk else None
-    return render(request, "analytics/reports.html", dashboard_context(analysis))
+    return render(request, "analytics/reports.html", reports_context(analysis))
+
+
+@login_required
+def download_analysis_report(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    bundle = build_analysis_zip_bytes(analysis)
+    filename = f"pipolmetrics-analysis-{slug_token(analysis.display_name, 'analysis')}.zip"
+    return FileResponse(bundle, as_attachment=True, filename=filename, content_type="application/zip")
+
+
+@login_required
+def download_mall_report(request, pk):
+    mall = get_object_or_404(Mall, pk=pk)
+    bundle = build_mall_zip_bytes(mall)
+    filename = f"pipolmetrics-establecimiento-{slug_token(mall.name, 'establecimiento')}.zip"
+    return FileResponse(bundle, as_attachment=True, filename=filename, content_type="application/zip")
 
 
 @login_required
@@ -335,10 +348,13 @@ def mall_detail(request, pk):
 @require_POST
 def move_analysis_to_mall(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
-    try:
-        payload = json.loads(request.body or "{}")
-    except json.JSONDecodeError:
-        return JsonResponse({"ok": False, "error": "JSON invalido."}, status=400)
+    if request.content_type == "application/json":
+        try:
+            payload = json.loads(request.body or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"ok": False, "error": "JSON invalido."}, status=400)
+    else:
+        payload = request.POST
 
     mall_id = str(payload.get("mall_id", "")).strip()
     mall_group = None
@@ -348,12 +364,42 @@ def move_analysis_to_mall(request, pk):
     analysis.mall_group = mall_group
     analysis.mall = mall_group.name if mall_group else ""
     analysis.save(update_fields=["mall_group", "mall", "updated_at"])
-    return JsonResponse({
+    response = JsonResponse({
         "ok": True,
         "analysis_id": str(analysis.pk),
         "mall_id": str(mall_group.pk) if mall_group else "",
         "mall_name": mall_group.name if mall_group else "",
     })
+    if request.content_type == "application/json":
+        return response
+    messages.success(request, f"Analisis asignado a {mall_group.name if mall_group else 'sin establecimiento'}: {analysis.display_name}")
+    return redirect(request.POST.get("next") or "mall_board")
+
+
+@login_required
+@require_POST
+def rename_analysis(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    next_name = request.POST.get("name", "").strip()
+    if not next_name:
+        messages.error(request, "El nombre del analisis no puede estar vacio.")
+        return redirect(request.POST.get("next") or "mall_board")
+
+    analysis.name = next_name
+    analysis.save(update_fields=["name", "updated_at"])
+    messages.success(request, f"Analisis actualizado: {analysis.display_name}")
+    return redirect(request.POST.get("next") or "mall_board")
+
+
+@login_required
+@require_POST
+def unassign_analysis(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    analysis.mall_group = None
+    analysis.mall = ""
+    analysis.save(update_fields=["mall_group", "mall", "updated_at"])
+    messages.success(request, f"Analisis desasignado: {analysis.display_name}")
+    return redirect(request.POST.get("next") or "mall_board")
 
 
 @login_required

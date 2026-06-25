@@ -15,6 +15,8 @@ urlpatterns = [
     path("malls/create/", views.create_mall, name="create_mall"),
     path("analyses/new/", views.video_upload, name="video_upload"),
     path("analyses/<uuid:pk>/move-mall/", views.move_analysis_to_mall, name="move_analysis_to_mall"),
+    path("analyses/<uuid:pk>/rename/", views.rename_analysis, name="rename_analysis"),
+    path("analyses/<uuid:pk>/unassign/", views.unassign_analysis, name="unassign_analysis"),
     path("analyses/<uuid:pk>/zones/", views.zone_editor, name="zone_editor"),
     path("analyses/<uuid:pk>/status/", views.analysis_status, name="analysis_status"),
     path("analyses/<uuid:pk>/start/", views.start_analysis, name="start_analysis"),
@@ -24,4 +26,6 @@ urlpatterns = [
     path("analyses/<uuid:pk>/results/", views.analysis_results, name="analysis_results"),
     path("reports/", views.reports, name="reports"),
     path("reports/<uuid:pk>/", views.reports, name="reports_for_analysis"),
+    path("reports/analysis/<uuid:pk>/download/", views.download_analysis_report, name="download_analysis_report"),
+    path("reports/mall/<int:pk>/download/", views.download_mall_report, name="download_mall_report"),
 ]

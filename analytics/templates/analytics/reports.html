@@ -1,12 +1,12 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Reportes | People Metrics{% endblock %}
+{% block title %}Reportes | PIPOLMETRICS{% endblock %}
 
 {% block content %}
 <header class="page-bar">
   <div>
     <span class="eyebrow">Auditoria</span>
-    <h1>Archivos del analisis</h1>
+    <h1>Centro de reportes</h1>
     {% if analysis %}
       <div class="analysis-heading">
         <strong class="analysis-title">{{ analysis.display_name }}</strong>
@@ -17,60 +17,153 @@
         </div>
       </div>
     {% else %}
-      <p>Ultimo analisis disponible</p>
+      <p>Descarga reportes por establecimiento o por analisis individual.</p>
     {% endif %}
   </div>
-  <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
+  <div class="actions">
+    <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
+    {% if analysis %}
+      <a class="primary-button" href="{% url 'download_analysis_report' analysis.pk %}"><i data-lucide="download"></i><span>Descargar reporte del analisis</span></a>
+    {% endif %}
+  </div>
 </header>
 
 <section class="panel data-panel">
   <div class="panel-title">
-    <h2>Archivos generados</h2>
-    {% if analysis %}<span>{{ analysis.get_status_display }}</span>{% endif %}
+    <h2>Reportes por establecimiento</h2>
+    <span>{{ mall_report_rows|length }} establecimientos</span>
   </div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Reporte</th><th>Archivo</th><th>Estado</th></tr></thead>
-      <tbody>
-        {% for report in report_files %}
-          <tr>
-            <td>{{ report.name }}</td>
-            <td>
-              {% if report.url %}
-                <a href="{{ report.url }}">{{ report.filename }}</a>
-              {% else %}
-                {{ report.filename }}
-              {% endif %}
-            </td>
-            <td>{% if report.exists %}<span class="ok">Disponible</span>{% else %}<span class="missing">Pendiente</span>{% endif %}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% if mall_report_rows %}
+    <div class="study-list">
+      {% for row in mall_report_rows %}
+        <article class="study-row">
+          <div>
+            <div class="analysis-heading">
+              <h2 class="analysis-title">{{ row.mall.name }}</h2>
+              <div class="analysis-context">
+                <span class="type-pill">{{ row.analyses|length }} analisis</span>
+              </div>
+            </div>
+            {% if row.mall.notes %}<p>{{ row.mall.notes }}</p>{% endif %}
+            <details class="analysis-detail-toggle">
+              <summary><i data-lucide="files"></i><span>Ver analisis incluidos</span></summary>
+              <div class="report-analysis-list">
+                {% if row.analyses %}
+                  {% for item in row.analyses %}
+                    <div class="report-analysis-item">
+                      <div>
+                        <span class="analysis-status-overline status-{{ item.status }}">{{ item.get_status_display|upper }}</span>
+                        <strong>{{ item.display_name }}</strong>
+                      </div>
+                      <div class="actions">
+                        <a class="ghost-button" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Ver reporte</span></a>
+                        <a class="ghost-button" href="{% url 'download_analysis_report' item.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
+                      </div>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="empty-state compact-empty">
+                    <i data-lucide="folder-open"></i>
+                    <span>Sin analisis asociados</span>
+                  </div>
+                {% endif %}
+              </div>
+            </details>
+          </div>
+          <div class="study-actions">
+            <a class="primary-button" href="{% url 'download_mall_report' row.mall.pk %}"><i data-lucide="archive"></i><span>Descargar reporte</span></a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><i data-lucide="building-2"></i><span>Sin establecimientos para exportar</span></div>
+  {% endif %}
 </section>
 
-<section class="panel data-panel">
-  <div class="panel-title"><h2>Eventos recientes</h2><span>{{ event_rows|length }} filas</span></div>
-  {% if event_rows %}
+{% if analysis %}
+  <section class="panel data-panel">
+    <div class="panel-title">
+      <h2>Archivos del analisis</h2>
+      <span>{{ analysis.get_status_display }}</span>
+    </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Tiempo</th><th>Evento</th><th>Persona</th><th>Zona</th><th>Tienda</th></tr></thead>
+        <thead><tr><th>Reporte</th><th>Archivo</th><th>Estado</th></tr></thead>
         <tbody>
-          {% for row in event_rows %}
+          {% for report in report_files %}
             <tr>
-              <td>{{ row.timestamp }}</td>
-              <td>{{ row.event_type }}</td>
-              <td>{{ row.person_label|default:row.person_id }}</td>
-              <td>{{ row.zone_name|default:"-" }}</td>
-              <td>{{ row.store_name|default:"-" }}</td>
+              <td>{{ report.name }}</td>
+              <td>
+                {% if report.url %}
+                  <a href="{{ report.url }}">{{ report.filename }}</a>
+                {% else %}
+                  {{ report.filename }}
+                {% endif %}
+              </td>
+              <td>{% if report.exists %}<span class="ok">Disponible</span>{% else %}<span class="missing">Pendiente</span>{% endif %}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+  </section>
+{% endif %}
+
+<section class="panel data-panel">
+  <div class="panel-title">
+    <h2>Analisis sin establecimiento</h2>
+    <span>{{ unassigned_analyses|length }} analisis</span>
+  </div>
+  {% if unassigned_analyses %}
+    <div class="study-list">
+      {% for item in unassigned_analyses %}
+        <article class="study-row compact">
+          <div>
+            <span class="analysis-status-overline status-{{ item.status }}">{{ item.get_status_display|upper }}</span>
+            <div class="analysis-heading">
+              <h2 class="analysis-title">{{ item.display_name }}</h2>
+              <div class="analysis-context">
+                <span class="type-pill">Sin establecimiento</span>
+                <span class="type-pill">{{ item.category_label|default:"General" }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="study-actions">
+            <a class="ghost-button" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Ver reporte</span></a>
+            <a class="ghost-button" href="{% url 'download_analysis_report' item.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
   {% else %}
-    <div class="empty-state"><i data-lucide="list-tree"></i><span>Sin eventos exportados</span></div>
+    <div class="empty-state"><i data-lucide="folder-check"></i><span>No hay analisis sueltos</span></div>
   {% endif %}
 </section>
+
+{% if analysis %}
+  <section class="panel data-panel">
+    <div class="panel-title"><h2>Eventos recientes</h2><span>{{ event_rows|length }} filas</span></div>
+    {% if event_rows %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tiempo</th><th>Evento</th><th>Persona</th><th>Zona</th><th>Contexto</th></tr></thead>
+          <tbody>
+            {% for row in event_rows %}
+              <tr>
+                <td>{{ row.timestamp }}</td>
+                <td>{{ row.event_type }}</td>
+                <td>{{ row.person_label|default:row.person_id }}</td>
+                <td>{{ row.zone_name|default:"-" }}</td>
+                <td>{{ row.store_name|default:"-" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state"><i data-lucide="list-tree"></i><span>Sin eventos exportados</span></div>
+    {% endif %}
+  </section>
+{% endif %}
 {% endblock %}

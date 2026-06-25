@@ -13,15 +13,95 @@ from config import ZONE_STYLES
 
 from .analysis_engine import run_analysis_job
 from .forms import MallForm, VideoUploadForm
-from .models import AnalysisRun, Mall
+from .models import AnalysisAuditLog, AnalysisRun, InsightNote, Mall, ZoneVersion
 from .services import (
     build_analysis_zip_bytes,
+    build_executive_pdf_bytes,
+    build_executive_pptx_bytes,
     build_mall_zip_bytes,
+    build_mall_executive_pdf_bytes,
+    build_mall_executive_pptx_bytes,
     dashboard_context,
     prepare_video_metadata,
     reports_context,
     slug_token,
 )
+
+
+def audit_event(request, action, analysis=None, mall=None, **metadata):
+    AnalysisAuditLog.objects.create(
+        action=action,
+        analysis=analysis,
+        mall=mall,
+        actor=request.user if getattr(request, "user", None) and request.user.is_authenticated else None,
+        metadata={key: value for key, value in metadata.items() if value not in (None, "")},
+    )
+
+
+def user_role_label(user):
+    if not user or not user.is_authenticated:
+        return "Invitado"
+    if user.is_superuser:
+        return "Administrador"
+    group = user.groups.order_by("name").first()
+    if group:
+        return group.name
+    return "Analista"
+
+
+def filtered_analyses_from_request(request, base=None):
+    analyses = (base if base is not None else AnalysisRun.objects.select_related("mall_group")).all()
+    filters = {
+        "mall": request.GET.get("mall", "").strip(),
+        "category": request.GET.get("category", "").strip(),
+        "area": request.GET.get("area", "").strip(),
+        "zone": request.GET.get("zone", "").strip(),
+        "status": request.GET.get("status", "").strip(),
+        "date_from": request.GET.get("date_from", "").strip(),
+        "date_to": request.GET.get("date_to", "").strip(),
+    }
+    if filters["mall"]:
+        analyses = analyses.filter(mall_group__name=filters["mall"])
+    if filters["category"]:
+        analyses = analyses.filter(category=filters["category"])
+    if filters["area"]:
+        analyses = analyses.filter(area=filters["area"])
+    if filters["zone"]:
+        zone_query = filters["zone"].casefold()
+        matching_ids = []
+        for analysis in analyses.only("id", "zones"):
+            zone_blob = " ".join(
+                " ".join(str(zone.get(key, "")) for key in ("id", "name", "type"))
+                for zone in (analysis.zones or [])
+                if isinstance(zone, dict)
+            ).casefold()
+            if zone_query in zone_blob:
+                matching_ids.append(analysis.pk)
+        analyses = analyses.filter(pk__in=matching_ids)
+    if filters["status"]:
+        analyses = analyses.filter(status=filters["status"])
+    if filters["date_from"]:
+        analyses = analyses.filter(created_at__date__gte=filters["date_from"])
+    if filters["date_to"]:
+        analyses = analyses.filter(created_at__date__lte=filters["date_to"])
+    return analyses, filters
+
+
+def filter_options_context():
+    zone_options = set()
+    for zones in AnalysisRun.objects.values_list("zones", flat=True):
+        for zone in zones or []:
+            if isinstance(zone, dict):
+                label = (zone.get("name") or zone.get("id") or zone.get("type") or "").strip()
+                if label:
+                    zone_options.add(label)
+    return {
+        "mall_options": Mall.objects.values_list("name", flat=True),
+        "category_options": AnalysisRun.objects.exclude(category="").order_by("category").values_list("category", flat=True).distinct(),
+        "area_options": AnalysisRun.objects.exclude(area="").order_by("area").values_list("area", flat=True).distinct(),
+        "zone_options": sorted(zone_options),
+        "status_options": AnalysisRun.Status.choices,
+    }
 
 
 def clamp_point(point, frame_width, frame_height):
@@ -131,48 +211,41 @@ def board_columns(analyses):
 
 @login_required
 def dashboard(request):
-    return render(request, "analytics/dashboard.html", dashboard_context())
+    analyses, selected_filters = filtered_analyses_from_request(request)
+    context = dashboard_context(overview_analyses=analyses)
+    context.update(filter_options_context())
+    context.update({
+        "selected_filters": selected_filters,
+        "user_role": user_role_label(request.user),
+        "clear_url": reverse("dashboard"),
+    })
+    return render(request, "analytics/dashboard.html", context)
 
 
 @login_required
 def mall_board(request):
-    analyses = AnalysisRun.objects.all()
-    selected_category = request.GET.get("category", "").strip()
-    if selected_category:
-        analyses = analyses.filter(category=selected_category)
-
-    category_options = AnalysisRun.objects.exclude(category="").order_by("category").values_list("category", flat=True).distinct()
+    analyses, selected_filters = filtered_analyses_from_request(request)
+    options = filter_options_context()
     return render(request, "analytics/analysis_list.html", {
         "analyses": analyses,
         "board_columns": board_columns(analyses),
         "available_analyses": analyses.filter(mall_group__isnull=True).order_by("-created_at"),
-        "category_options": category_options,
-        "selected_category": selected_category,
+        "selected_filters": selected_filters,
         "mall_form": MallForm(initial={"accent_color": "#2563EB"}),
+        "clear_url": reverse("mall_board"),
+        **options,
     })
 
 
 @login_required
 def analysis_list(request):
-    analyses = AnalysisRun.objects.select_related("mall_group").all()
-    selected_mall = request.GET.get("mall", "").strip()
-    selected_category = request.GET.get("category", "").strip()
-    selected_status = request.GET.get("status", "").strip()
-    if selected_mall:
-        analyses = analyses.filter(mall_group__name=selected_mall)
-    if selected_category:
-        analyses = analyses.filter(category=selected_category)
-    if selected_status:
-        analyses = analyses.filter(status=selected_status)
+    analyses, selected_filters = filtered_analyses_from_request(request)
 
     return render(request, "analytics/analysis_runs.html", {
         "analyses": analyses,
-        "mall_options": Mall.objects.values_list("name", flat=True),
-        "category_options": AnalysisRun.objects.exclude(category="").order_by("category").values_list("category", flat=True).distinct(),
-        "status_options": AnalysisRun.Status.choices,
-        "selected_mall": selected_mall,
-        "selected_category": selected_category,
-        "selected_status": selected_status,
+        "selected_filters": selected_filters,
+        "clear_url": reverse("analysis_list"),
+        **filter_options_context(),
     })
 
 
@@ -187,6 +260,7 @@ def video_upload(request):
             analysis.mall = analysis.mall_group.name if analysis.mall_group else ""
             analysis.status_message = "Leyendo video"
             analysis.save()
+            audit_event(request, AnalysisAuditLog.Action.UPLOAD, analysis=analysis, mall=analysis.mall_group, video_name=analysis.video.name)
             try:
                 prepare_video_metadata(analysis)
             except RuntimeError as error:
@@ -223,6 +297,15 @@ def zone_editor(request, pk):
         analysis.status_message = "Listo para ejecutar analisis"
         analysis.error_message = ""
         analysis.save(update_fields=["zones", "status", "progress", "status_message", "error_message", "updated_at"])
+        next_version = (analysis.zone_versions.order_by("-version").values_list("version", flat=True).first() or 0) + 1
+        ZoneVersion.objects.create(
+            analysis=analysis,
+            version=next_version,
+            zones=zones,
+            note="Guardado desde editor de zonas",
+            created_by=request.user,
+        )
+        audit_event(request, AnalysisAuditLog.Action.ZONES_SAVE, analysis=analysis, mall=analysis.mall_group, zones=len(zones), version=next_version)
         return redirect("analysis_status", pk=analysis.pk)
 
     zone_styles = {
@@ -246,7 +329,59 @@ def analysis_status(request, pk):
 @login_required
 def analysis_results(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
-    return render(request, "analytics/dashboard.html", dashboard_context(analysis))
+    context = dashboard_context(analysis)
+    context.update({
+        "user_role": user_role_label(request.user),
+    })
+    return render(request, "analytics/dashboard.html", context)
+
+
+@login_required
+def analysis_presentation(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    return render(request, "analytics/presentation.html", dashboard_context(analysis))
+
+
+@login_required
+@require_POST
+def save_insight_note(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    insight_key = request.POST.get("insight_key", "").strip()
+    body = request.POST.get("body", "").strip()
+    if not insight_key:
+        messages.error(request, "No se pudo identificar el insight.")
+        return redirect("analysis_results", pk=analysis.pk)
+
+    InsightNote.objects.update_or_create(
+        analysis=analysis,
+        insight_key=insight_key,
+        defaults={"body": body, "created_by": request.user},
+    )
+    audit_event(request, AnalysisAuditLog.Action.NOTE_SAVE, analysis=analysis, mall=analysis.mall_group, insight_key=insight_key)
+    messages.success(request, "Nota guardada junto al insight.")
+    return redirect("analysis_results", pk=analysis.pk)
+
+
+@login_required
+@require_POST
+def restore_zone_version(request, pk, version_id):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    version = get_object_or_404(ZoneVersion, pk=version_id, analysis=analysis)
+    analysis.zones = version.zones
+    analysis.status = AnalysisRun.Status.READY
+    analysis.status_message = "Version de zonas restaurada; vuelve a ejecutar para recalcular resultados"
+    analysis.save(update_fields=["zones", "status", "status_message", "updated_at"])
+    next_version = (analysis.zone_versions.order_by("-version").values_list("version", flat=True).first() or 0) + 1
+    ZoneVersion.objects.create(
+        analysis=analysis,
+        version=next_version,
+        zones=version.zones,
+        note=f"Restaurada desde v{version.version}",
+        created_by=request.user,
+    )
+    audit_event(request, AnalysisAuditLog.Action.ZONES_SAVE, analysis=analysis, mall=analysis.mall_group, restored_from=version.version, version=next_version)
+    messages.success(request, f"Zonas restauradas desde version {version.version}.")
+    return redirect("zone_editor", pk=analysis.pk)
 
 
 @login_required
@@ -260,6 +395,7 @@ def download_analysis_report(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     bundle = build_analysis_zip_bytes(analysis)
     filename = f"pipolmetrics-analysis-{slug_token(analysis.display_name, 'analysis')}.zip"
+    audit_event(request, AnalysisAuditLog.Action.REPORT_DOWNLOAD, analysis=analysis, mall=analysis.mall_group, format="zip")
     return FileResponse(bundle, as_attachment=True, filename=filename, content_type="application/zip")
 
 
@@ -268,7 +404,44 @@ def download_mall_report(request, pk):
     mall = get_object_or_404(Mall, pk=pk)
     bundle = build_mall_zip_bytes(mall)
     filename = f"pipolmetrics-establecimiento-{slug_token(mall.name, 'establecimiento')}.zip"
+    audit_event(request, AnalysisAuditLog.Action.REPORT_DOWNLOAD, mall=mall, format="zip", scope="establecimiento")
     return FileResponse(bundle, as_attachment=True, filename=filename, content_type="application/zip")
+
+
+@login_required
+def download_mall_executive_pdf(request, pk):
+    mall = get_object_or_404(Mall, pk=pk)
+    bundle = build_mall_executive_pdf_bytes(mall)
+    filename = f"pipolmetrics-ejecutivo-establecimiento-{slug_token(mall.name, 'establecimiento')}.pdf"
+    audit_event(request, AnalysisAuditLog.Action.EXECUTIVE_EXPORT, mall=mall, format="pdf", scope="establecimiento")
+    return FileResponse(bundle, as_attachment=True, filename=filename, content_type="application/pdf")
+
+
+@login_required
+def download_mall_executive_pptx(request, pk):
+    mall = get_object_or_404(Mall, pk=pk)
+    bundle = build_mall_executive_pptx_bytes(mall)
+    filename = f"pipolmetrics-ejecutivo-establecimiento-{slug_token(mall.name, 'establecimiento')}.pptx"
+    audit_event(request, AnalysisAuditLog.Action.EXECUTIVE_EXPORT, mall=mall, format="pptx", scope="establecimiento")
+    return FileResponse(bundle, as_attachment=True, filename=filename, content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
+
+@login_required
+def download_executive_pdf(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    bundle = build_executive_pdf_bytes(analysis)
+    filename = f"pipolmetrics-ejecutivo-{slug_token(analysis.display_name, 'analysis')}.pdf"
+    audit_event(request, AnalysisAuditLog.Action.EXECUTIVE_EXPORT, analysis=analysis, mall=analysis.mall_group, format="pdf")
+    return FileResponse(bundle, as_attachment=True, filename=filename, content_type="application/pdf")
+
+
+@login_required
+def download_executive_pptx(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    bundle = build_executive_pptx_bytes(analysis)
+    filename = f"pipolmetrics-ejecutivo-{slug_token(analysis.display_name, 'analysis')}.pptx"
+    audit_event(request, AnalysisAuditLog.Action.EXECUTIVE_EXPORT, analysis=analysis, mall=analysis.mall_group, format="pptx")
+    return FileResponse(bundle, as_attachment=True, filename=filename, content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
 
 @login_required
@@ -313,6 +486,7 @@ def create_mall(request):
             mall_group.accent_color = form.cleaned_data["accent_color"]
             mall_group.notes = form.cleaned_data["notes"]
             mall_group.save(update_fields=["accent_color", "notes", "updated_at"])
+            audit_event(request, AnalysisAuditLog.Action.MALL_CHANGE, mall=mall_group, operation="create")
         if created:
             messages.success(request, f"Establecimiento creado: {mall_group.name}")
         else:
@@ -331,6 +505,7 @@ def mall_detail(request, pk):
             form.save()
             Mall.objects.filter(pk=mall.pk).update(updated_at=timezone.now())
             AnalysisRun.objects.filter(mall_group=mall).update(mall=mall.name)
+            audit_event(request, AnalysisAuditLog.Action.MALL_CHANGE, mall=mall, operation="update")
             messages.success(request, f"Establecimiento actualizado: {mall.name}")
             return redirect("mall_board")
     else:
@@ -364,6 +539,7 @@ def move_analysis_to_mall(request, pk):
     analysis.mall_group = mall_group
     analysis.mall = mall_group.name if mall_group else ""
     analysis.save(update_fields=["mall_group", "mall", "updated_at"])
+    audit_event(request, AnalysisAuditLog.Action.MOVE, analysis=analysis, mall=mall_group, target_mall=mall_group.name if mall_group else "")
     response = JsonResponse({
         "ok": True,
         "analysis_id": str(analysis.pk),
@@ -387,6 +563,7 @@ def rename_analysis(request, pk):
 
     analysis.name = next_name
     analysis.save(update_fields=["name", "updated_at"])
+    audit_event(request, AnalysisAuditLog.Action.RENAME, analysis=analysis, mall=analysis.mall_group, name=next_name)
     messages.success(request, f"Analisis actualizado: {analysis.display_name}")
     return redirect(request.POST.get("next") or "mall_board")
 
@@ -398,6 +575,7 @@ def unassign_analysis(request, pk):
     analysis.mall_group = None
     analysis.mall = ""
     analysis.save(update_fields=["mall_group", "mall", "updated_at"])
+    audit_event(request, AnalysisAuditLog.Action.UNASSIGN, analysis=analysis)
     messages.success(request, f"Analisis desasignado: {analysis.display_name}")
     return redirect(request.POST.get("next") or "mall_board")
 
@@ -409,6 +587,7 @@ def delete_mall(request, pk):
     linked_analyses = AnalysisRun.objects.filter(mall_group=establecimiento)
     linked_analyses.update(mall_group=None, mall="", updated_at=timezone.now())
     mall_name = establecimiento.name
+    audit_event(request, AnalysisAuditLog.Action.MALL_CHANGE, mall=establecimiento, operation="delete", linked_analyses=linked_analyses.count())
     establecimiento.delete()
     messages.success(request, f"Establecimiento eliminado: {mall_name}. Sus analisis quedaron sin establecimiento asignado.")
     return redirect("mall_board")
@@ -445,6 +624,7 @@ def start_analysis(request, pk):
         "output_dir",
         "updated_at",
     ])
+    audit_event(request, AnalysisAuditLog.Action.RUN_START, analysis=analysis, mall=analysis.mall_group)
 
     thread = threading.Thread(target=run_analysis_job, args=(analysis.pk,), daemon=True)
     thread.start()
@@ -459,6 +639,7 @@ def cancel_analysis(request, pk):
         analysis.status = AnalysisRun.Status.CANCELED
         analysis.status_message = "Cancelacion solicitada"
         analysis.save(update_fields=["status", "status_message", "updated_at"])
+        audit_event(request, AnalysisAuditLog.Action.RUN_CANCEL, analysis=analysis, mall=analysis.mall_group)
     return redirect("analysis_status", pk=analysis.pk)
 
 
@@ -471,6 +652,7 @@ def delete_analysis(request, pk):
         return redirect("analysis_list")
 
     name = analysis.display_name
+    audit_event(request, AnalysisAuditLog.Action.DELETE, analysis=analysis, mall=analysis.mall_group, name=name)
     analysis.delete_artifacts()
     analysis.delete()
     messages.success(request, f"Analisis eliminado: {name}")

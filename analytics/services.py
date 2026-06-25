@@ -5,12 +5,13 @@ import re
 import zipfile
 from datetime import timedelta
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils import timezone
 
-from .models import AnalysisRun, Mall
+from .models import AnalysisAuditLog, AnalysisRun, InsightNote, Mall
 
 
 REPORT_FILES = {
@@ -40,6 +41,44 @@ REPORT_LABELS = {
     "people": "Tracks de personas",
     "dwell": "Permanencia",
 }
+
+METRIC_DICTIONARY = [
+    {
+        "key": "personas_validadas",
+        "name": "Personas validadas",
+        "formula": "Tracks persistentes confirmados por el motor de deteccion.",
+        "source": "analytics_summary.csv / person_tracks.csv",
+        "confidence": "Alta si el video tiene buena resolucion y personas completas.",
+    },
+    {
+        "key": "entradas_zona",
+        "name": "Entradas a zonas",
+        "formula": "Cruces de centroides hacia poligonos con permanencia minima.",
+        "source": "zone_metrics.csv / zone_events.csv",
+        "confidence": "Media-alta; depende de calidad del poligono y angulo de camara.",
+    },
+    {
+        "key": "permanencia",
+        "name": "Permanencia promedio",
+        "formula": "Promedio de tiempo observado dentro de zonas o trayectorias.",
+        "source": "zone_metrics.csv / dwell_times.csv",
+        "confidence": "Media; mejora con FPS estable y baja oclusion.",
+    },
+    {
+        "key": "indice_friccion",
+        "name": "Indice de friccion",
+        "formula": "Entradas, permanencia y personas unicas combinadas para detectar cuellos de botella.",
+        "source": "zone_metrics.csv",
+        "confidence": "Indicador comparativo, no conteo absoluto.",
+    },
+    {
+        "key": "calidad_video",
+        "name": "Calidad del video",
+        "formula": "Resolucion, FPS, duracion, zonas configuradas y avance de procesamiento.",
+        "source": "Metadatos de AnalysisRun",
+        "confidence": "Diagnostico tecnico para interpretar confiabilidad.",
+    },
+]
 
 
 def slug_token(value, fallback="item"):
@@ -400,6 +439,224 @@ def operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event
     }
 
 
+def video_quality_score(analysis):
+    width = safe_int(getattr(analysis, "frame_width", 0))
+    height = safe_int(getattr(analysis, "frame_height", 0))
+    fps = safe_float(getattr(analysis, "fps", 0))
+    total_frames = safe_int(getattr(analysis, "total_frames", 0))
+    processed_frames = safe_int(getattr(analysis, "processed_frames", 0))
+    duration = total_frames / fps if fps else 0
+    zones_count = len(getattr(analysis, "zones", []) or [])
+
+    score = 0
+    checks = []
+
+    resolution_ok = width >= 1280 and height >= 720
+    score += 30 if resolution_ok else 15 if width and height else 0
+    checks.append({"label": "Resolucion", "value": f"{width}x{height}" if width and height else "Sin metadata", "ok": resolution_ok})
+
+    fps_ok = fps >= 24
+    score += 25 if fps_ok else 12 if fps else 0
+    checks.append({"label": "FPS", "value": format_number(fps) if fps else "-", "ok": fps_ok})
+
+    duration_ok = duration >= 30
+    score += 20 if duration_ok else 10 if duration else 0
+    checks.append({"label": "Duracion", "value": format_hms(duration), "ok": duration_ok})
+
+    zones_ok = zones_count > 0
+    score += 15 if zones_ok else 0
+    checks.append({"label": "Zonas", "value": str(zones_count), "ok": zones_ok})
+
+    coverage = processed_frames / total_frames if total_frames else 0
+    coverage_ok = coverage >= 0.95 or analysis.status == AnalysisRun.Status.COMPLETED
+    score += 10 if coverage_ok else 4 if processed_frames else 0
+    checks.append({"label": "Cobertura", "value": f"{round(coverage * 100)}%" if total_frames else "-", "ok": coverage_ok})
+
+    score = min(100, round(score))
+    label = "Excelente" if score >= 85 else "Operativa" if score >= 70 else "Revisar" if score >= 50 else "Critica"
+    return {"score": score, "label": label, "checks": checks}
+
+
+def friction_rows(zone_metric_rows, zone_rows):
+    source = zone_metric_rows or zone_rows
+    rows = []
+    for row in source:
+        entries = safe_int(row.get("entry_count"))
+        unique = safe_int(row.get("unique_people_count"))
+        dwell = safe_float(row.get("avg_dwell_time_seconds"))
+        score = round(entries * 0.45 + unique * 0.2 + dwell * 0.35, 1)
+        if score > 0:
+            rows.append({
+                "label": row.get("zone_name") or row.get("zone_id") or "Zona",
+                "score": score,
+                "entries": entries,
+                "unique": unique,
+                "dwell": format_hms(dwell),
+            })
+    return sorted(rows, key=lambda row: row["score"], reverse=True)[:8]
+
+
+def trajectory_cluster_rows(people_rows):
+    clusters = {}
+    for row in people_rows:
+        first_zone = row.get("first_zone") or "Sin zona inicial"
+        last_zone = row.get("last_zone") or "Sin zona final"
+        key = f"{first_zone} -> {last_zone}"
+        cluster = clusters.setdefault(key, {
+            "label": key,
+            "count": 0,
+            "visible_seconds": 0.0,
+            "distance": 0.0,
+        })
+        cluster["count"] += 1
+        cluster["visible_seconds"] += safe_float(row.get("visible_time_seconds"))
+        cluster["distance"] += safe_float(row.get("distance_px"))
+
+    rows = []
+    for cluster in clusters.values():
+        count = max(1, cluster["count"])
+        rows.append({
+            "label": cluster["label"],
+            "count": cluster["count"],
+            "avg_visible": format_hms(cluster["visible_seconds"] / count),
+            "avg_distance": round(cluster["distance"] / count, 1),
+        })
+    return sorted(rows, key=lambda row: row["count"], reverse=True)[:8]
+
+
+def layout_scenario_rows(friction_data):
+    scenarios = []
+    for row in friction_data[:3]:
+        scenarios.append({
+            "title": f"Redistribuir {row['label']}",
+            "body": "Duplicar, ampliar o dividir esta zona podria reducir espera percibida si el flujo esta concentrado.",
+            "impact": f"-{min(24, max(8, int(row['score'] // 4)))}% friccion estimada",
+        })
+    return scenarios
+
+
+def narrative_summary(analysis, summary, insights, alerts, comparison, video_quality):
+    lines = [
+        f"El analisis {analysis.display_name} muestra {summary.get('total_people', '-')} personas validadas y {summary.get('total_zone_entries', '0')} entradas a zonas.",
+        f"La zona dominante es {insights['busiest_zone']['label']} y el peak se observa en {insights['peak_time']['label']}.",
+        f"La calidad tecnica del video queda en {video_quality['score']}/100 ({video_quality['label']}).",
+    ]
+    if alerts:
+        lines.append(f"La alerta principal es {alerts[0]['title'].lower()}: {alerts[0]['body']}")
+    if comparison:
+        lines.append(f"Frente a {comparison['analysis'].display_name}, las entradas cambian {comparison['entries']['absolute']:+d}.")
+    return lines
+
+
+def operational_alerts(analysis, summary, insights, chart_payload, zone_metric_rows, zone_rows, video_quality):
+    alerts = []
+    total_entries = safe_int(summary.get("total_zone_entries"))
+    total_people = safe_int(summary.get("total_people"))
+    max_people = safe_int(insights["max_people"]["value"])
+    peak_value = safe_int(insights["peak_time"]["value"])
+    time_values = [
+        safe_int(row.get("events")) or safe_int(row.get("entries")) or safe_int(row.get("visible"))
+        for row in chart_payload.get("time", [])
+    ]
+    avg_activity = sum(time_values) / len(time_values) if time_values else 0
+    busiest = insights["busiest_zone"]
+
+    if peak_value and avg_activity and peak_value >= avg_activity * 1.6:
+        alerts.append({
+            "level": "high",
+            "title": "Peak anomalo",
+            "body": f"{insights['peak_time']['label']} concentra {peak_value} eventos, sobre el promedio del video.",
+        })
+    if time_values and min(time_values) == 0:
+        alerts.append({
+            "level": "medium",
+            "title": "Caida de deteccion",
+            "body": "Hay tramos sin actividad detectada; conviene revisar si es baja demanda real, oclusion o perdida de tracking.",
+        })
+    if max_people >= max(8, round(total_people * 0.35)) and total_people:
+        alerts.append({
+            "level": "high",
+            "title": "Sobreocupacion relativa",
+            "body": f"El maximo simultaneo llega a {max_people} personas, alto frente al total validado del video.",
+        })
+    if total_entries and safe_int(busiest["value"]) >= total_entries * 0.45:
+        alerts.append({
+            "level": "high",
+            "title": "Zona dominante",
+            "body": f"{busiest['label']} concentra una parte relevante de las entradas.",
+        })
+    metric_source = zone_metric_rows or zone_rows
+    for row in metric_source:
+        if safe_float(row.get("avg_dwell_time_seconds")) >= 60:
+            alerts.append({
+                "level": "medium",
+                "title": "Cola persistente",
+                "body": f"{row.get('zone_name') or row.get('zone_id') or 'Una zona'} supera 60 segundos promedio.",
+            })
+            break
+    if metric_source:
+        cold_zones = [
+            row.get("zone_name") or row.get("zone_id") or "Zona"
+            for row in metric_source
+            if safe_int(row.get("entry_count")) == 0 and (safe_int(row.get("unique_people_count")) == 0 or total_entries > 0)
+        ]
+        if cold_zones and len(cold_zones) < len(metric_source):
+            alerts.append({
+                "level": "medium",
+                "title": "Zona fria",
+                "body": f"{cold_zones[0]} no registra entradas mientras otras zonas si reciben flujo.",
+            })
+    if video_quality["score"] < 70:
+        alerts.append({
+            "level": "medium",
+            "title": "Calidad de video mejorable",
+            "body": f"Score {video_quality['score']}/100. Interpreta los resultados con cautela.",
+        })
+    if analysis.status != AnalysisRun.Status.COMPLETED:
+        alerts.append({
+            "level": "low",
+            "title": "Analisis no completado",
+            "body": "Algunas metricas pueden estar incompletas hasta terminar la ejecucion.",
+        })
+    return alerts[:5]
+
+
+def analysis_comparison(analysis, summary, ranking_rows_data):
+    if not analysis:
+        return None
+    candidates = AnalysisRun.objects.filter(
+        status=AnalysisRun.Status.COMPLETED,
+        created_at__lt=analysis.created_at,
+    ).exclude(pk=analysis.pk)
+    if analysis.mall_group_id:
+        candidates = candidates.filter(mall_group=analysis.mall_group)
+    if analysis.category:
+        candidates = candidates.filter(category=analysis.category)
+    if analysis.area:
+        candidates = candidates.filter(area=analysis.area)
+    previous = candidates.first()
+    if not previous:
+        return None
+
+    previous_snapshot = analysis_summary_snapshot(previous)
+    current_people = safe_int(summary.get("total_people"))
+    current_entries = safe_int(summary.get("total_zone_entries"))
+    previous_people = previous_snapshot["total_people"]
+    previous_entries = previous_snapshot["zone_entries"]
+
+    def delta(current, previous):
+        absolute = current - previous
+        pct = round((absolute / previous) * 100, 1) if previous else None
+        return {"current": current, "previous": previous, "absolute": absolute, "pct": pct}
+
+    return {
+        "analysis": previous,
+        "people": delta(current_people, previous_people),
+        "entries": delta(current_entries, previous_entries),
+        "top_zone": ranking_rows_data[0]["label"] if ranking_rows_data else "-",
+    }
+
+
 def stair_rows_for_chart(stair_rows):
     return [
         {
@@ -529,12 +786,200 @@ def build_mall_zip_bytes(mall):
     return bundle
 
 
-def mall_overview_cards():
+def executive_report_lines(analysis):
+    context = dashboard_context(analysis)
+    summary = context["summary"]
+    insights = context["operational_insights"]
+    quality = context["video_quality"]
+    alerts = context["operational_alerts"]
+    lines = [
+        f"PIPOLMETRICS - Reporte ejecutivo",
+        f"Analisis: {analysis.display_name}",
+        f"Establecimiento: {analysis.mall_label or 'Sin establecimiento'}",
+        f"Categoria: {analysis.category_label or 'General'}",
+        f"Zona o sector: {analysis.area_label or 'Sin sector'}",
+        "",
+        "Resumen",
+        f"Personas validadas: {summary.get('total_people', '-')}",
+        f"Entradas a zonas: {summary.get('total_zone_entries', '0')}",
+        f"Actividad focal: {summary.get('total_focus_activity', summary.get('total_zone_entries', '0'))}",
+        f"Permanencia promedio: {summary.get('avg_dwell_time', '-')}",
+        "",
+        "Highlights",
+        f"Zona mas transitada: {insights['busiest_zone']['label']} ({insights['busiest_zone']['value']} eventos)",
+        f"Maximo de personas: {insights['max_people']['value']} ({insights['max_people']['label']})",
+        f"Horario peak: {insights['peak_time']['label']} ({insights['peak_time']['value']} eventos)",
+        f"Horario minimo: {insights['quiet_time']['label']} ({insights['quiet_time']['value']} eventos)",
+        f"Calidad de video: {quality['score']}/100 - {quality['label']}",
+        "",
+        "Alertas operativas",
+    ]
+    if alerts:
+        lines.extend(f"- {alert['title']}: {alert['body']}" for alert in alerts)
+    else:
+        lines.append("- Sin alertas relevantes con la evidencia actual.")
+    if context["analysis_comparison"]:
+        comparison = context["analysis_comparison"]
+        lines.extend([
+            "",
+            "Comparacion",
+            f"Base anterior: {comparison['analysis'].display_name}",
+            f"Personas: {comparison['people']['current']} vs {comparison['people']['previous']} ({comparison['people']['absolute']:+d})",
+            f"Entradas: {comparison['entries']['current']} vs {comparison['entries']['previous']} ({comparison['entries']['absolute']:+d})",
+        ])
+    return lines
+
+
+def mall_executive_report_lines(mall):
+    analyses = list(mall.analyses.order_by("-created_at")[:12])
+    completed = [analysis for analysis in analyses if analysis.status == AnalysisRun.Status.COMPLETED]
+    snapshots = [analysis_summary_snapshot(analysis) for analysis in completed]
+    total_people = sum(snapshot["total_people"] for snapshot in snapshots)
+    total_entries = sum(snapshot["zone_entries"] for snapshot in snapshots)
+    total_focus = sum(snapshot["store_entries"] for snapshot in snapshots)
+    lines = [
+        "PIPOLMETRICS - Reporte ejecutivo de establecimiento",
+        f"Establecimiento: {mall.name}",
+        f"Notas operativas: {mall.notes or 'Sin notas'}",
+        f"Analisis revisados: {len(analyses)}",
+        f"Analisis completados: {len(completed)}",
+        "",
+        "Resumen acumulado",
+        f"Personas validadas: {total_people}",
+        f"Entradas a zonas: {total_entries}",
+        f"Actividad focal: {total_focus}",
+        "",
+        "Analisis incluidos",
+    ]
+    if snapshots:
+        for snapshot in snapshots[:8]:
+            lines.append(
+                f"- {snapshot['analysis'].display_name}: {snapshot['total_people']} personas, {snapshot['zone_entries']} entradas"
+            )
+    else:
+        lines.append("- Sin analisis completados para consolidar.")
+    return lines
+
+
+def pdf_escape(text):
+    return str(text).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def build_pdf_from_lines(lines):
+    content_lines = ["BT", "/F1 11 Tf", "50 780 Td", "14 TL"]
+    for index, line in enumerate(lines[:48]):
+        if index:
+            content_lines.append("T*")
+        content_lines.append(f"({pdf_escape(line[:96])}) Tj")
+    content_lines.append("ET")
+    stream = "\n".join(content_lines).encode("latin-1", errors="replace")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
+    ]
+    pdf = io.BytesIO()
+    pdf.write(b"%PDF-1.4\n")
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(pdf.tell())
+        pdf.write(f"{index} 0 obj\n".encode("ascii"))
+        pdf.write(obj)
+        pdf.write(b"\nendobj\n")
+    xref_offset = pdf.tell()
+    pdf.write(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    pdf.write(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.write(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.write(f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode("ascii"))
+    pdf.seek(0)
+    return pdf
+
+
+def build_executive_pdf_bytes(analysis):
+    return build_pdf_from_lines(executive_report_lines(analysis))
+
+
+def build_mall_executive_pdf_bytes(mall):
+    return build_pdf_from_lines(mall_executive_report_lines(mall))
+
+
+def pptx_slide_xml(title, bullets):
+    bullet_xml = "".join(
+        f"<a:p><a:r><a:rPr lang=\"es-CL\" sz=\"2200\"/><a:t>{escape(str(bullet))}</a:t></a:r></a:p>"
+        for bullet in bullets
+    )
+    return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld><p:spTree>
+    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+    <p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="457200" y="365760"/><a:ext cx="8229600" cy="914400"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="es-CL" sz="3600" b="1"/><a:t>{escape(str(title))}</a:t></a:r></a:p></p:txBody></p:sp>
+    <p:sp><p:nvSpPr><p:cNvPr id="3" name="Body"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="685800" y="1371600"/><a:ext cx="7772400" cy="4572000"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/>{bullet_xml}</p:txBody></p:sp>
+  </p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sld>"""
+
+
+def build_pptx_from_lines(lines):
+    chunks = [
+        ("Resumen ejecutivo", lines[1:10]),
+        ("Highlights operativos", lines[12:20]),
+        ("Alertas y siguientes pasos", lines[22:34]),
+    ]
+    bundle = io.BytesIO()
+    with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+<Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
+<Override PartName="/ppt/slides/slide2.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
+<Override PartName="/ppt/slides/slide3.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
+</Types>""")
+        archive.writestr("_rels/.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+</Relationships>""")
+        archive.writestr("ppt/presentation.xml", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+<p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/><p:sldId id="258" r:id="rId3"/></p:sldIdLst>
+<p:sldSz cx="9144000" cy="5143500" type="wide"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>""")
+        archive.writestr("ppt/_rels/presentation.xml.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"/>
+<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide3.xml"/>
+</Relationships>""")
+        for index, (title, bullets) in enumerate(chunks, start=1):
+            archive.writestr(f"ppt/slides/slide{index}.xml", pptx_slide_xml(title, bullets[:8]))
+            archive.writestr(f"ppt/slides/_rels/slide{index}.xml.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>""")
+    bundle.seek(0)
+    return bundle
+
+
+def build_executive_pptx_bytes(analysis):
+    return build_pptx_from_lines(executive_report_lines(analysis))
+
+
+def build_mall_executive_pptx_bytes(mall):
+    return build_pptx_from_lines(mall_executive_report_lines(mall))
+
+
+def mall_overview_cards(analyses=None):
     cards = []
     malls = list(Mall.objects.all())
+    allowed_ids = None
+    if analyses is not None:
+        allowed_ids = set(analyses.values_list("pk", flat=True))
     for mall in malls:
-        analyses = list(mall.analyses.order_by("-created_at"))
-        completed = [analysis for analysis in analyses if analysis.status == AnalysisRun.Status.COMPLETED]
+        mall_analyses = list(mall.analyses.order_by("-created_at"))
+        if allowed_ids is not None:
+            mall_analyses = [analysis for analysis in mall_analyses if analysis.pk in allowed_ids]
+            if not mall_analyses:
+                continue
+        completed = [analysis for analysis in mall_analyses if analysis.status == AnalysisRun.Status.COMPLETED]
         snapshots = [analysis_summary_snapshot(analysis) for analysis in completed[:6]]
         latest_snapshot = snapshots[0] if snapshots else None
 
@@ -550,7 +995,7 @@ def mall_overview_cards():
 
         cards.append({
             "mall": mall,
-            "analysis_count": len(analyses),
+            "analysis_count": len(mall_analyses),
             "completed_count": len(completed),
             "latest_snapshot": latest_snapshot,
             "recent_snapshots": snapshots[:3],
@@ -562,9 +1007,9 @@ def mall_overview_cards():
     return sorted(cards, key=lambda card: card["analysis_count"], reverse=True)
 
 
-def dashboard_context(analysis=None):
+def dashboard_context(analysis=None, overview_analyses=None):
     if analysis is None:
-        mall_cards = mall_overview_cards()
+        mall_cards = mall_overview_cards(overview_analyses)
         return {
             "dashboard_mode": "overview",
             "mall_cards": mall_cards,
@@ -594,9 +1039,20 @@ def dashboard_context(analysis=None):
         "spatialZones": spatial_zone_rows(zone_rows, zone_metric_rows),
         "time": time_series_rows(time_rows, analysis),
         "trafficSurface": traffic_surface_payload(analysis, zone_rows, zone_metric_rows, time_rows, event_rows),
+        "friction": friction_rows(zone_metric_rows, zone_rows),
+        "clusters": trajectory_cluster_rows(people_rows),
         "stairs": stair_rows_for_chart(stair_rows),
     }
     insights = operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event_rows)
+    video_quality = video_quality_score(analysis)
+    alerts = operational_alerts(analysis, summary, insights, chart_payload, zone_metric_rows, zone_rows, video_quality)
+    comparison = analysis_comparison(analysis, summary, chart_payload["ranking"])
+    scenarios = layout_scenario_rows(chart_payload["friction"])
+    narrative = narrative_summary(analysis, summary, insights, alerts, comparison, video_quality)
+    insight_notes = {
+        note.insight_key: note
+        for note in InsightNote.objects.filter(analysis=analysis)
+    }
 
     return {
         "dashboard_mode": "analysis",
@@ -609,6 +1065,17 @@ def dashboard_context(analysis=None):
         "time_chart_rows": chart_payload["time"],
         "stair_chart_rows": chart_payload["stairs"],
         "operational_insights": insights,
+        "operational_alerts": alerts,
+        "analysis_comparison": comparison,
+        "video_quality": video_quality,
+        "friction_rows": chart_payload["friction"],
+        "trajectory_clusters": chart_payload["clusters"],
+        "layout_scenarios": scenarios,
+        "narrative_summary": narrative,
+        "metric_dictionary": METRIC_DICTIONARY,
+        "insight_notes": insight_notes,
+        "zone_versions": analysis.zone_versions.select_related("created_by")[:6],
+        "audit_logs": AnalysisAuditLog.objects.select_related("actor").filter(analysis=analysis)[:8],
         "zone_rows": zone_metric_rows or zone_rows,
         "store_rows": store_rows,
         "time_rows": time_rows,

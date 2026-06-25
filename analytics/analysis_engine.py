@@ -1,5 +1,6 @@
 import csv
 import json
+import os
 import re
 import sqlite3
 import time
@@ -17,6 +18,7 @@ from config import (
     iou_value,
     model_name,
     parking_frame_stride,
+    parking_slot_miss_tolerance,
     parking_model_name,
     tracker_type,
     zone_report_file,
@@ -915,6 +917,8 @@ def export_parking_analytics(
 
 
 def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
+    import torch
+
     video_path = str(Path(analysis.video.path))
     zones = [
         vision_utils.normalize_zone_geometry(zone.copy(), analysis.frame_width, analysis.frame_height)
@@ -932,8 +936,23 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
             "zones": zones,
         }, file, indent=2, ensure_ascii=False)
 
-    update_analysis(analysis.pk, status_message="Cargando modelo YOLO para vehiculos")
+    if torch.cuda.is_available():
+        inference_device = "cuda:0"
+    elif getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+        inference_device = "mps"
+    else:
+        inference_device = "cpu"
+        try:
+            torch.set_num_threads(max(1, min(os.cpu_count() or 1, 8)))
+        except Exception:
+            pass
+
+    update_analysis(analysis.pk, status_message=f"Cargando modelo YOLO para vehiculos en {inference_device.upper()}")
     model = YOLO(parking_model_name)
+    try:
+        model.to(inference_device)
+    except Exception:
+        inference_device = "cpu"
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         fail_analysis(analysis.pk, f"No se pudo abrir el video: {video_path}")
@@ -985,14 +1004,28 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
                 x2 = min(fw, (gx + 1) * tile_w + overlap_x)
                 y2 = min(fh, (gy + 1) * tile_h + overlap_y)
                 tile = frame[y1:y2, x1:x2]
-                result = model(tile, verbose=False, conf=max(tracking_confidence, 0.08), iou=iou_value, imgsz=1280)
+                result = model(
+                    tile,
+                    verbose=False,
+                    conf=max(tracking_confidence, 0.08),
+                    iou=iou_value,
+                    imgsz=1280,
+                    device=inference_device,
+                )
                 detections.extend(collect_vehicle_boxes(result, x1, y1))
         return detections
 
     def vehicle_detections(frame, detailed=False):
         enhanced = enhance_night_frame(frame)
         detections = collect_vehicle_boxes(
-            model(enhanced, verbose=False, conf=max(tracking_confidence, 0.08), iou=iou_value, imgsz=1280)
+            model(
+                enhanced,
+                verbose=False,
+                conf=max(tracking_confidence, 0.08),
+                iou=iou_value,
+                imgsz=1280,
+                device=inference_device,
+            )
         )
         if detailed or len(detections) <= 1:
             detections.extend(tiled_vehicle_detections(enhanced, grid=2))
@@ -1033,6 +1066,7 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
         slot["slot_id"]: {
             "occupied": False,
             "current_session": None,
+            "missed_frames": 0,
         }
         for slot in slot_specs
     }
@@ -1114,6 +1148,7 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
             if matching:
                 det = max(matching, key=lambda item: item["conf"])
                 occupied_now.add(slot["slot_id"])
+                state["missed_frames"] = 0
                 if not state["occupied"]:
                     arrivals += 1
                     state["occupied"] = True
@@ -1127,11 +1162,16 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
                         "y": round(det["cy"], 1),
                         "departed": False,
                     }
+                elif state["current_session"] is not None:
+                    state["current_session"]["x"] = round(det["cx"], 1)
+                    state["current_session"]["y"] = round(det["cy"], 1)
                 overlay_color = (96, 165, 250)
                 cv2.rectangle(frame, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), overlay_color, 2)
                 cv2.rectangle(heatmap, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), 1.0, -1)
             else:
-                if state["occupied"] and state["current_session"] is not None:
+                if state["occupied"]:
+                    state["missed_frames"] += 1
+                if state["occupied"] and state["current_session"] is not None and state["missed_frames"] >= max(1, parking_slot_miss_tolerance):
                     departures += 1
                     session = state["current_session"]
                     session["departure_seconds"] = current_time
@@ -1140,8 +1180,13 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
                     session["departed"] = True
                     slot_sessions.append(session)
                     state["current_session"] = None
-                state["occupied"] = False
-                cv2.rectangle(frame, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), (80, 88, 105), 1)
+                    state["occupied"] = False
+                if state["occupied"]:
+                    occupied_now.add(slot["slot_id"])
+                    cv2.rectangle(frame, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), (96, 165, 250), 2)
+                    cv2.rectangle(heatmap, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), 0.65, -1)
+                else:
+                    cv2.rectangle(frame, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), (80, 88, 105), 1)
 
         occupied_count = len(occupied_now)
         peak_occupied_slots = max(peak_occupied_slots, occupied_count)

@@ -28,6 +28,9 @@ display_every_n_frames = 2
 # En estacionamientos no hace falta analizar cada frame para medir ocupacion.
 parking_frame_stride = 4
 
+# Cantidad de frames procesados consecutivos sin deteccion antes de cerrar una sesion.
+parking_slot_miss_tolerance = 3
+
 
 # ============================================================
 # COLORES DE INTERFAZ

@@ -7,6 +7,10 @@
   const zoneTypes = document.getElementById("zoneTypes");
   const zoneName = document.getElementById("zoneName");
   const addZoneType = document.getElementById("addZoneType");
+  const zoneTypeCreator = document.getElementById("zoneTypeCreator");
+  const newZoneTypeName = document.getElementById("newZoneTypeName");
+  const saveZoneType = document.getElementById("saveZoneType");
+  const cancelZoneType = document.getElementById("cancelZoneType");
   const undoZone = document.getElementById("undoZone");
   const clearZones = document.getElementById("clearZones");
   const ctx = canvas.getContext("2d");
@@ -129,13 +133,30 @@
       editButton.setAttribute("title", `Editar ${style.label}`);
       editButton.innerHTML = '<i data-lucide="pencil"></i>';
       editButton.addEventListener("click", () => {
-        const nextLabel = window.prompt("Nombre del tipo de zona", style.label);
-        if (!nextLabel || !nextLabel.trim()) return;
-        const nextValue = nextLabel.trim().toUpperCase();
-        zoneStyles[type].label = nextLabel.trim().toUpperCase();
-        zones = zones.map(zone => zone.type === type ? { ...zone, type_label: nextValue } : zone);
-        buildTypeButtons();
-        draw();
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = style.label;
+        input.className = "zone-type-inline-input";
+        button.replaceWith(input);
+        input.focus();
+        input.select();
+
+        const finish = (shouldSave) => {
+          const nextLabel = input.value.trim();
+          if (shouldSave && nextLabel) {
+            const nextValue = nextLabel.toUpperCase();
+            zoneStyles[type].label = nextValue;
+            zones = zones.map(zone => zone.type === type ? { ...zone, type_label: nextValue } : zone);
+          }
+          buildTypeButtons();
+          draw();
+        };
+
+        input.addEventListener("keydown", event => {
+          if (event.key === "Enter") finish(true);
+          if (event.key === "Escape") finish(false);
+        });
+        input.addEventListener("blur", () => finish(true), { once: true });
       });
 
       row.appendChild(button);
@@ -145,8 +166,7 @@
     if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
   }
 
-  function addCustomZoneType() {
-    const label = window.prompt("Nombre del nuevo tipo de zona", "Nueva zona");
+  function createCustomZoneType(label) {
     if (!label || !label.trim()) return;
     const token = nextUniqueTypeToken(label);
     zoneStyles[token] = {
@@ -155,6 +175,23 @@
     };
     currentType = token;
     buildTypeButtons();
+  }
+
+  function showZoneTypeCreator() {
+    if (!zoneTypeCreator || !newZoneTypeName) return;
+    zoneTypeCreator.hidden = false;
+    newZoneTypeName.value = "";
+    newZoneTypeName.focus();
+  }
+
+  function hideZoneTypeCreator() {
+    if (!zoneTypeCreator) return;
+    zoneTypeCreator.hidden = true;
+  }
+
+  function saveCustomZoneType() {
+    createCustomZoneType(newZoneTypeName?.value || "");
+    hideZoneTypeCreator();
   }
 
   function resizeCanvas() {
@@ -469,7 +506,13 @@
     draw();
   });
 
-  addZoneType?.addEventListener("click", addCustomZoneType);
+  addZoneType?.addEventListener("click", showZoneTypeCreator);
+  cancelZoneType?.addEventListener("click", hideZoneTypeCreator);
+  saveZoneType?.addEventListener("click", saveCustomZoneType);
+  newZoneTypeName?.addEventListener("keydown", event => {
+    if (event.key === "Enter") saveCustomZoneType();
+    if (event.key === "Escape") hideZoneTypeCreator();
+  });
 
   form.addEventListener("submit", () => {
     zones = zones.filter(isValidZone).map(updateBounds);

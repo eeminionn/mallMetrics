@@ -14,7 +14,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils import timezone
 
-from .models import AnalysisAuditLog, AnalysisRun, InsightNote, Mall
+from .models import AnalysisAuditLog, AnalysisRun, AppConfiguration, InsightNote, Mall
 
 
 REPORT_FILES = {
@@ -730,8 +730,15 @@ def extract_response_text(response_payload):
     return ""
 
 
+def openai_runtime_config():
+    config = AppConfiguration.get_solo()
+    api_key = config.openai_api_key.strip() or getattr(settings, "OPENAI_API_KEY", "")
+    model = config.openai_model.strip() or getattr(settings, "OPENAI_ANALYST_MODEL", "gpt-4o-mini")
+    return api_key, model
+
+
 def request_openai_analyst(analysis, summary, insights, alerts, comparison, video_quality, layout_scenarios):
-    api_key = getattr(settings, "OPENAI_API_KEY", "")
+    api_key, model = openai_runtime_config()
     if not api_key:
         return None
 
@@ -771,7 +778,7 @@ def request_openai_analyst(analysis, summary, insights, alerts, comparison, vide
         content.append({"type": "input_image", "image_url": image_url})
 
     request_payload = {
-        "model": getattr(settings, "OPENAI_ANALYST_MODEL", "gpt-4o-mini"),
+        "model": model,
         "input": [{"role": "user", "content": content}],
         "text": {
             "format": {
@@ -807,7 +814,8 @@ def request_openai_analyst(analysis, summary, insights, alerts, comparison, vide
 
 def ai_analyst_context(analysis, summary, insights, alerts, comparison, video_quality, layout_scenarios):
     fallback = local_ai_analyst(summary, insights, alerts, layout_scenarios, video_quality)
-    if not getattr(settings, "OPENAI_API_KEY", ""):
+    api_key, _model = openai_runtime_config()
+    if not api_key:
         return fallback
 
     cache_key = "ai_analyst_v1"

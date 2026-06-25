@@ -10,8 +10,12 @@
     <p>Lista de corridas concretas para revisar estado, zonas, reportes y resultados.</p>
   </div>
   <div class="actions">
-    <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Establecimientos</span></a>
-    <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
+    {% if can_manage_establishments %}
+      <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Establecimientos</span></a>
+    {% endif %}
+    {% if can_create_analysis %}
+      <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
+    {% endif %}
   </div>
 </header>
 
@@ -47,17 +51,21 @@
           </div>
           <div class="study-actions">
             <nav class="analysis-tabs" aria-label="Acciones del analisis">
-              <a class="analysis-tab" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+              {% if can_edit_analysis %}
+                <a class="analysis-tab" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+              {% endif %}
               <a class="analysis-tab status-{{ item.status }}" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>{{ item.get_status_display }}</span></a>
               <a class="analysis-tab" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Reportes</span></a>
               {% if item.status == "completed" %}
                 <a class="analysis-tab is-emphasis" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Ver resultado</span></a>
               {% endif %}
             </nav>
-            <form method="post" action="{% url 'delete_analysis' item.pk %}" data-confirm-title="Eliminar analisis" data-confirm-message="Se eliminara {{ item.display_name }} y todos sus archivos generados." data-confirm-label="Eliminar analisis">
-              {% csrf_token %}
-              <button class="danger-button icon-button" type="submit" aria-label="Eliminar analisis" title="Eliminar analisis"><i data-lucide="trash-2"></i></button>
-            </form>
+            {% if can_delete %}
+              <form method="post" action="{% url 'delete_analysis' item.pk %}" data-confirm-title="Eliminar analisis" data-confirm-message="Se eliminara {{ item.display_name }} y todos sus archivos generados." data-confirm-label="Eliminar analisis">
+                {% csrf_token %}
+                <button class="danger-button icon-button" type="submit" aria-label="Eliminar analisis" title="Eliminar analisis"><i data-lucide="trash-2"></i></button>
+              </form>
+            {% endif %}
           </div>
         </article>
       {% endfor %}

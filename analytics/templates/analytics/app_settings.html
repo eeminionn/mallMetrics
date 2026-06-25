@@ -1,0 +1,41 @@
+{% extends "analytics/base.html" %}
+
+{% block title %}Configuracion | PIPOLMETRICS{% endblock %}
+
+{% block content %}
+<header class="page-bar">
+  <div>
+    <span class="eyebrow">Administracion</span>
+    <h1>Configuracion</h1>
+    <p>Gestiona integraciones y parametros del analista IA sin editar codigo.</p>
+  </div>
+  <a class="ghost-button" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resultados</span></a>
+</header>
+
+<section class="form-layout">
+  <form class="panel upload-panel" method="post">
+    {% csrf_token %}
+    <div class="panel-title">
+      <h2>OpenAI</h2>
+      <span>{{ config.masked_openai_key }}</span>
+    </div>
+    {{ form.non_field_errors }}
+    <label for="{{ form.openai_api_key.id_for_label }}">API key</label>
+    {{ form.openai_api_key }}
+    {{ form.openai_api_key.errors }}
+    <label for="{{ form.openai_model.id_for_label }}">Modelo</label>
+    {{ form.openai_model }}
+    {{ form.openai_model.errors }}
+    <button class="primary-button full" type="submit"><i data-lucide="save"></i><span>Guardar configuracion</span></button>
+  </form>
+
+  <aside class="panel checklist">
+    <div class="panel-title"><h2>Uso de IA</h2></div>
+    <ul>
+      <li><i data-lucide="check"></i><span>Genera narrativa ejecutiva, comentarios de calidad y recomendaciones de layout.</span></li>
+      <li><i data-lucide="check"></i><span>Si no hay API key, PIPOLMETRICS usa el analisis local.</span></li>
+      <li><i data-lucide="check"></i><span>La key queda guardada en la base de datos local del proyecto.</span></li>
+    </ul>
+  </aside>
+</section>
+{% endblock %}

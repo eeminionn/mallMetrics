@@ -12,9 +12,18 @@ from django.views.decorators.http import require_POST
 
 from config import ZONE_STYLES
 
+from .access import (
+    ROLE_ADMIN,
+    ROLE_ANALYST,
+    ROLE_AUDITOR,
+    ROLE_EXECUTIVE,
+    ROLE_SUPERVISOR,
+    role_required,
+    user_role,
+)
 from .analysis_engine import run_analysis_job
-from .forms import MallForm, VideoUploadForm
-from .models import AnalysisAuditLog, AnalysisRun, InsightNote, Mall, ZoneVersion
+from .forms import AppConfigurationForm, MallForm, VideoUploadForm
+from .models import AnalysisAuditLog, AnalysisRun, AppConfiguration, InsightNote, Mall, ZoneVersion
 from .services import (
     build_analysis_zip_bytes,
     build_executive_pdf_bytes,
@@ -40,14 +49,7 @@ def audit_event(request, action, analysis=None, mall=None, **metadata):
 
 
 def user_role_label(user):
-    if not user or not user.is_authenticated:
-        return "Invitado"
-    if user.is_superuser:
-        return "Administrador"
-    group = user.groups.order_by("name").first()
-    if group:
-        return group.name
-    return "Analista"
+    return user_role(user)
 
 
 def filtered_analyses_from_request(request, base=None):
@@ -222,6 +224,7 @@ def board_columns(analyses):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_SUPERVISOR, ROLE_ANALYST, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def dashboard(request):
     analyses, selected_filters = filtered_analyses_from_request(request)
     context = dashboard_context(overview_analyses=analyses)
@@ -235,6 +238,7 @@ def dashboard(request):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_SUPERVISOR)
 def mall_board(request):
     analyses, selected_filters = filtered_analyses_from_request(request)
     options = filter_options_context()
@@ -250,6 +254,7 @@ def mall_board(request):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_SUPERVISOR, ROLE_ANALYST, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def analysis_list(request):
     analyses, selected_filters = filtered_analyses_from_request(request)
 
@@ -262,6 +267,30 @@ def analysis_list(request):
 
 
 @login_required
+@role_required(ROLE_ADMIN)
+def app_settings(request):
+    config = AppConfiguration.get_solo()
+    if request.method == "POST":
+        current_key = config.openai_api_key
+        form = AppConfigurationForm(request.POST, instance=config)
+        if form.is_valid():
+            next_config = form.save(commit=False)
+            if not form.cleaned_data.get("openai_api_key"):
+                next_config.openai_api_key = current_key
+            next_config.save()
+            messages.success(request, "Configuracion actualizada.")
+            return redirect("app_settings")
+    else:
+        form = AppConfigurationForm(instance=config)
+
+    return render(request, "analytics/app_settings.html", {
+        "form": form,
+        "config": config,
+    })
+
+
+@login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def video_upload(request):
     if request.method == "POST":
         form = VideoUploadForm(request.POST, request.FILES)
@@ -289,6 +318,7 @@ def video_upload(request):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def zone_editor(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     if request.method == "POST":
@@ -341,12 +371,14 @@ def zone_editor(request, pk):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def analysis_status(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     return render(request, "analytics/analysis_status.html", {"analysis": analysis})
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def analysis_results(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     context = dashboard_context(analysis)
@@ -357,6 +389,7 @@ def analysis_results(request, pk):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def analysis_presentation(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     return render(request, "analytics/presentation.html", dashboard_context(analysis))
@@ -364,6 +397,7 @@ def analysis_presentation(request, pk):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR)
 def save_insight_note(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     insight_key = request.POST.get("insight_key", "").strip()
@@ -384,6 +418,7 @@ def save_insight_note(request, pk):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def restore_zone_version(request, pk, version_id):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     version = get_object_or_404(ZoneVersion, pk=version_id, analysis=analysis)
@@ -405,12 +440,14 @@ def restore_zone_version(request, pk, version_id):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def reports(request, pk=None):
     analysis = get_object_or_404(AnalysisRun, pk=pk) if pk else None
     return render(request, "analytics/reports.html", reports_context(analysis))
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def download_analysis_report(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     bundle = build_analysis_zip_bytes(analysis)
@@ -420,6 +457,7 @@ def download_analysis_report(request, pk):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def download_mall_report(request, pk):
     mall = get_object_or_404(Mall, pk=pk)
     bundle = build_mall_zip_bytes(mall)
@@ -429,6 +467,7 @@ def download_mall_report(request, pk):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def download_mall_executive_pdf(request, pk):
     mall = get_object_or_404(Mall, pk=pk)
     bundle = build_mall_executive_pdf_bytes(mall)
@@ -438,6 +477,7 @@ def download_mall_executive_pdf(request, pk):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def download_mall_executive_pptx(request, pk):
     mall = get_object_or_404(Mall, pk=pk)
     bundle = build_mall_executive_pptx_bytes(mall)
@@ -447,6 +487,7 @@ def download_mall_executive_pptx(request, pk):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def download_executive_pdf(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     bundle = build_executive_pdf_bytes(analysis)
@@ -456,6 +497,7 @@ def download_executive_pdf(request, pk):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR, ROLE_EXECUTIVE, ROLE_AUDITOR)
 def download_executive_pptx(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     bundle = build_executive_pptx_bytes(analysis)
@@ -465,6 +507,7 @@ def download_executive_pptx(request, pk):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR)
 def analysis_progress(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     preview_path = analysis.output_path / "preview_frame.jpg"
@@ -498,6 +541,7 @@ def format_hms(seconds):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN, ROLE_SUPERVISOR)
 def create_mall(request):
     form = MallForm(request.POST)
     if form.is_valid():
@@ -517,6 +561,7 @@ def create_mall(request):
 
 
 @login_required
+@role_required(ROLE_ADMIN, ROLE_SUPERVISOR)
 def mall_detail(request, pk):
     mall = get_object_or_404(Mall, pk=pk)
     if request.method == "POST":
@@ -541,6 +586,7 @@ def mall_detail(request, pk):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN, ROLE_SUPERVISOR)
 def move_analysis_to_mall(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     if request.content_type == "application/json":
@@ -574,6 +620,7 @@ def move_analysis_to_mall(request, pk):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR)
 def rename_analysis(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     next_name = request.POST.get("name", "").strip()
@@ -590,6 +637,7 @@ def rename_analysis(request, pk):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN, ROLE_SUPERVISOR)
 def unassign_analysis(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     analysis.mall_group = None
@@ -602,6 +650,7 @@ def unassign_analysis(request, pk):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN)
 def delete_mall(request, pk):
     establecimiento = get_object_or_404(Mall, pk=pk)
     linked_analyses = AnalysisRun.objects.filter(mall_group=establecimiento)
@@ -615,6 +664,7 @@ def delete_mall(request, pk):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def start_analysis(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     if analysis.status == AnalysisRun.Status.RUNNING:
@@ -653,6 +703,7 @@ def start_analysis(request, pk):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def cancel_analysis(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     if analysis.status == AnalysisRun.Status.RUNNING:
@@ -665,6 +716,7 @@ def cancel_analysis(request, pk):
 
 @login_required
 @require_POST
+@role_required(ROLE_ADMIN)
 def delete_analysis(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     if analysis.status == AnalysisRun.Status.RUNNING:

@@ -29,6 +29,35 @@ class Mall(models.Model):
         return self.name
 
 
+class AppConfiguration(models.Model):
+    openai_api_key = models.CharField(max_length=255, blank=True)
+    openai_model = models.CharField(max_length=80, default="gpt-4o-mini")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuracion"
+        verbose_name_plural = "Configuracion"
+
+    def __str__(self):
+        return "Configuracion PIPOLMETRICS"
+
+    @classmethod
+    def get_solo(cls):
+        config, _ = cls.objects.get_or_create(pk=1)
+        return config
+
+    @property
+    def has_openai_key(self):
+        return bool(self.openai_api_key.strip())
+
+    @property
+    def masked_openai_key(self):
+        key = self.openai_api_key.strip()
+        if not key:
+            return "Sin configurar"
+        return f"{key[:7]}...{key[-4:]}" if len(key) > 12 else "Configurada"
+
+
 class AnalysisRun(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Borrador"

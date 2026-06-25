@@ -699,6 +699,14 @@
       @apply grid grid-cols-[minmax(0,1fr)_auto] gap-2;
     }
 
+    .zone-type-creator {
+      @apply mb-3 rounded-lg border border-line bg-carbon p-3;
+    }
+
+    .zone-type-inline-input {
+      @apply min-h-12 rounded-lg border border-signal bg-carbon px-3 py-2 text-sm font-semibold uppercase text-copy outline-none ring-2 ring-signal/20;
+    }
+
     .zone-type {
       @apply flex min-h-12 w-full items-center gap-3 rounded-lg border border-line bg-panel-2 px-3 py-2 text-left text-sm font-medium text-copy transition;
     }
@@ -1173,6 +1181,10 @@
       outline: 2px solid #60a5fa;
       outline-offset: -2px;
       background: rgba(37, 99, 235, 0.12);
+    }
+
+    .chart-hover-readout {
+      @apply mt-3 inline-flex min-h-10 w-full items-center gap-2 rounded-lg border border-line bg-carbon px-3 py-2 text-sm font-medium text-muted;
     }
 
     .mall-summary-grid,

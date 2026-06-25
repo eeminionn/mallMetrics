@@ -34,17 +34,26 @@
 
         <nav class="nav">
           <a class="{% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'analysis_results' %}active{% endif %}" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resultados</span></a>
-          <a class="{% if request.resolver_match.url_name == 'mall_board' or request.resolver_match.url_name == 'mall_detail' %}active{% endif %}" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Establecimientos</span></a>
+          {% if can_manage_establishments %}
+            <a class="{% if request.resolver_match.url_name == 'mall_board' or request.resolver_match.url_name == 'mall_detail' %}active{% endif %}" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Establecimientos</span></a>
+          {% endif %}
           <a class="{% if request.resolver_match.url_name == 'analysis_list' or request.resolver_match.url_name == 'zone_editor' or request.resolver_match.url_name == 'analysis_status' %}active{% endif %}" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
-          <a class="{% if request.resolver_match.url_name == 'video_upload' %}active{% endif %}" href="{% url 'video_upload' %}"><i data-lucide="upload-cloud"></i><span>Nuevo analisis</span></a>
+          {% if can_create_analysis %}
+            <a class="{% if request.resolver_match.url_name == 'video_upload' %}active{% endif %}" href="{% url 'video_upload' %}"><i data-lucide="upload-cloud"></i><span>Nuevo analisis</span></a>
+          {% endif %}
           <a class="{% if request.resolver_match.url_name == 'reports' or request.resolver_match.url_name == 'reports_for_analysis' %}active{% endif %}" href="{% url 'reports' %}"><i data-lucide="table-2"></i><span>Reportes</span></a>
-          <a href="{% url 'admin:index' %}"><i data-lucide="shield-check"></i><span>Admin</span></a>
+          {% if can_configure %}
+            <a class="{% if request.resolver_match.url_name == 'app_settings' %}active{% endif %}" href="{% url 'app_settings' %}"><i data-lucide="settings"></i><span>Configuracion</span></a>
+          {% endif %}
+          {% if can_admin %}
+            <a href="{% url 'admin:index' %}"><i data-lucide="shield-check"></i><span>Admin</span></a>
+          {% endif %}
         </nav>
 
         <div class="sidebar-footer">
           <div class="user-chip">
             <i data-lucide="user-round"></i>
-            <span>{{ user.username }}</span>
+            <span>{{ user.username }} · {{ active_role }}</span>
           </div>
           <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}

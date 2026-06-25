@@ -11,8 +11,12 @@
       <p>Vista general para un analista: establecimientos, ultimos analisis, densidad y actividad resumida.</p>
     </div>
     <div class="actions">
-      <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Establecimientos</span></a>
-      <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
+      {% if can_manage_establishments %}
+        <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="building-2"></i><span>Establecimientos</span></a>
+      {% endif %}
+      {% if can_create_analysis %}
+        <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
+      {% endif %}
     </div>
   </header>
 
@@ -130,14 +134,18 @@
       <a class="ghost-button" href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard"></i><span>Resumen establecimientos</span></a>
       <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
       <nav class="analysis-tabs" aria-label="Acciones del analisis">
-        <a class="analysis-tab" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+        {% if can_edit_analysis %}
+          <a class="analysis-tab" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
+        {% endif %}
         <a class="analysis-tab" href="{% url 'download_analysis_report' analysis.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
         <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="table-2"></i><span>Reportes</span></a>
         <a class="analysis-tab" href="{% url 'download_executive_pdf' analysis.pk %}"><i data-lucide="file-text"></i><span>PDF ejecutivo</span></a>
         <a class="analysis-tab" href="#" data-dev-alert="Funcion en desarrollo"><i data-lucide="presentation"></i><span>PPTX</span></a>
         <a class="analysis-tab" href="{% url 'analysis_presentation' analysis.pk %}"><i data-lucide="monitor-play"></i><span>Modo presentacion</span></a>
       </nav>
-      <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
+      {% if can_create_analysis %}
+        <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
+      {% endif %}
     </div>
   </header>
 
@@ -309,6 +317,10 @@
         <span>Zona x hora x eventos</span>
       </div>
       <div id="zone3dChart" class="plotly-panel"></div>
+      <div id="zone3dHoverReadout" class="chart-hover-readout">
+        <i data-lucide="mouse-pointer-2"></i>
+        <span>Pasa el mouse sobre el grafico para ver horario, zona y eventos.</span>
+      </div>
     </article>
 
     <article class="panel">
@@ -587,7 +599,12 @@
     const surface = chartData.trafficSurface;
     const surfaceTimes = surface.timeShortLabels || surface.times.map(shortTimeLabel);
     const surfaceSeconds = surface.timeSeconds || surface.times.map((_, index) => index);
-    Plotly.newPlot("zone3dChart", [{
+    const zone3dNode = document.getElementById("zone3dChart");
+    const zone3dReadout = document.getElementById("zone3dHoverReadout");
+    const hoverText = surface.z.map((row, zoneIndex) => row.map((value, timeIndex) => {
+      return `Horario: ${surfaceTimes[timeIndex]} · Intervalo: ${surface.times[timeIndex]} · Zona: ${surface.zones[zoneIndex]} · Eventos: ${value}`;
+    }));
+    Plotly.newPlot(zone3dNode, [{
       type: "surface",
       x: surfaceSeconds,
       y: surface.zones.map((_, index) => index),
@@ -595,7 +612,9 @@
       colorscale: [[0, "#07111f"], [0.4, "#2563eb"], [0.75, "#38bdf8"], [1, "#d6ff72"]],
       contours: { z: { show: true, usecolormap: true, highlightcolor: "#ffffff", project: { z: true } } },
       colorbar: { title: "Eventos" },
-      hovertemplate: "Horario aprox: %{customdata[0]}<br>Intervalo: %{customdata[2]}<br>Zona: %{customdata[1]}<br>Eventos: %{z}<extra></extra>",
+      hoverinfo: "text",
+      hovertemplate: "%{text}<extra></extra>",
+      text: hoverText,
       customdata: surface.z.map((row, zoneIndex) => row.map((_, timeIndex) => [surfaceTimes[timeIndex], surface.zones[zoneIndex], surface.times[timeIndex]]))
     }], {
       paper_bgcolor: "rgba(0,0,0,0)",
@@ -610,6 +629,13 @@
       },
       font: { color: "#f8fbff", family: "Inter, sans-serif" }
     }, { responsive: true, displaylogo: false });
+    zone3dNode.on("plotly_hover", (event) => {
+      const point = event.points?.[0];
+      if (!point || !zone3dReadout) return;
+      const data = point.customdata || [];
+      zone3dReadout.innerHTML = `<i data-lucide="clock-3"></i><span>Horario ${data[0] || point.x} · ${data[1] || "Zona"} · ${point.z ?? 0} eventos</span>`;
+      if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
+    });
   } else {
     document.getElementById("zone3dChart").innerHTML = '<div class="empty-state"><i data-lucide="chart-no-axes-combined"></i><span>Sin suficientes datos temporales por zona</span></div>';
     if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });

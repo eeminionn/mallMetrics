@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("login/", auth_views.LoginView.as_view(template_name="analytics/login.html"), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("settings/", views.app_settings, name="app_settings"),
     path("malls/", views.mall_board, name="mall_board"),
     path("malls/<int:pk>/", views.mall_detail, name="mall_detail"),
     path("malls/<int:pk>/delete/", views.delete_mall, name="delete_mall"),

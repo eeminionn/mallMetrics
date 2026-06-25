@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import AnalysisRun, Mall
+from .models import AnalysisRun, AppConfiguration, Mall
 
 
 class VideoUploadForm(forms.ModelForm):
@@ -44,4 +44,25 @@ class MallForm(forms.ModelForm):
             "name": forms.TextInput(attrs={"placeholder": "Ej: Edificio Central"}),
             "accent_color": forms.TextInput(attrs={"type": "color"}),
             "notes": forms.Textarea(attrs={"rows": 4, "placeholder": "Ej: foco en acceso principal, piso 2 y sector oriente"}),
+        }
+
+
+class AppConfigurationForm(forms.ModelForm):
+    openai_api_key = forms.CharField(
+        label="API key de OpenAI",
+        required=False,
+        widget=forms.PasswordInput(attrs={
+            "placeholder": "Pega una nueva API key o deja vacio para mantener la actual",
+            "autocomplete": "off",
+        }),
+    )
+
+    class Meta:
+        model = AppConfiguration
+        fields = ["openai_api_key", "openai_model"]
+        labels = {
+            "openai_model": "Modelo de analista IA",
+        }
+        widgets = {
+            "openai_model": forms.TextInput(attrs={"placeholder": "Ej: gpt-4o-mini"}),
         }

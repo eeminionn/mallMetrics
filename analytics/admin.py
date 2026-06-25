@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AnalysisAuditLog, AnalysisRun, InsightNote, Mall, ZoneVersion
+from .models import AnalysisAuditLog, AnalysisRun, AppConfiguration, InsightNote, Mall, ZoneVersion
 
 
 @admin.register(AnalysisRun)
@@ -15,6 +15,12 @@ class AnalysisRunAdmin(admin.ModelAdmin):
 class MallAdmin(admin.ModelAdmin):
     list_display = ("name", "accent_color", "created_at", "updated_at")
     search_fields = ("name", "notes")
+
+
+@admin.register(AppConfiguration)
+class AppConfigurationAdmin(admin.ModelAdmin):
+    list_display = ("masked_openai_key", "openai_model", "updated_at")
+    readonly_fields = ("updated_at",)
 
 
 @admin.register(InsightNote)

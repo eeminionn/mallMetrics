@@ -701,19 +701,11 @@ def parking_zone_slots(zone, sample_box):
     zone_height = max(1, zone["y2"] - zone["y1"])
     sample_w = max(24.0, sample_box["w"])
     sample_h = max(24.0, sample_box["h"])
-    horizontal = zone_width >= zone_height
-
     slot_long = max(sample_w, sample_h) * 1.08
-    slot_short = min(sample_w, sample_h) * 1.18
-    if horizontal:
-        slot_w, slot_h = slot_long, slot_short
-    else:
-        slot_w, slot_h = slot_short, slot_long
-
-    cols = max(1, int(zone_width // max(slot_w, 1)))
-    rows = max(1, int(zone_height // max(slot_h, 1)))
+    cols = max(1, int(zone_width // max(slot_long, 1)))
+    rows = 1
     effective_slot_w = zone_width / cols
-    effective_slot_h = zone_height / rows
+    effective_slot_h = zone_height
 
     slots = []
     for row in range(rows):
@@ -1007,6 +999,21 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
             detections.extend(tiled_vehicle_detections(enhanced, grid=4))
         return dedupe_vehicle_detections(detections)
 
+    def draw_vehicle_boxes(frame, detections):
+        for det in detections:
+            x1, y1, x2, y2 = [int(det[key]) for key in ("x1", "y1", "x2", "y2")]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (92, 255, 160), 2)
+            cv2.putText(
+                frame,
+                f"auto {det['conf']:.2f}",
+                (x1, max(20, y1 - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.48,
+                (92, 255, 160),
+                2,
+            )
+        return frame
+
     initial_detections = vehicle_detections(first_frame, detailed=True)
     slot_specs = []
     for zone in zones:
@@ -1083,6 +1090,8 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
         occupied_now = set()
         arrivals = 0
         departures = 0
+
+        draw_vehicle_boxes(frame, detections)
 
         for slot in slot_specs:
             matching = [det for det in detections if point_inside_rect(det["cx"], det["cy"], slot)]

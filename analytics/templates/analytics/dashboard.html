@@ -416,7 +416,13 @@
         <div class="study-list">
           {% for scenario in ai_analyst.layout_recommendations %}
             <article class="mini-kpi">
-              <span>{{ scenario.impact }}</span>
+              <span>
+                {% if scenario.impact_pct or scenario.impact_pct == 0 %}
+                  {{ scenario.impact_pct }}% friccion estimada
+                {% else %}
+                  {{ scenario.impact }}
+                {% endif %}
+              </span>
               <strong>{{ scenario.title }}</strong>
               <small>{{ scenario.body }}</small>
             </article>

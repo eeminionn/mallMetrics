@@ -46,8 +46,8 @@ REPORT_LABELS = {
 }
 
 AI_ANALYST_CACHE_KEY = "ai_analyst_v1"
-AI_VIDEO_QUALITY_CACHE_KEY = "ai_video_quality_v1"
-AI_LAYOUT_CACHE_KEY = "ai_layout_review_v1"
+AI_VIDEO_QUALITY_CACHE_KEY = "ai_video_quality_v2"
+AI_LAYOUT_CACHE_KEY = "ai_layout_review_v2"
 
 METRIC_DICTIONARY = [
     {
@@ -622,10 +622,12 @@ def trajectory_cluster_rows(people_rows):
 def layout_scenario_rows(friction_data):
     scenarios = []
     for row in friction_data[:3]:
+        impact_pct = -min(24, max(8, int(row["score"] // 4)))
         scenarios.append({
             "title": f"Redistribuir {row['label']}",
             "body": "Duplicar, ampliar o dividir esta zona podria reducir espera percibida si el flujo esta concentrado.",
-            "impact": f"-{min(24, max(8, int(row['score'] // 4)))}% friccion estimada",
+            "impact": f"{impact_pct}% friccion estimada",
+            "impact_pct": impact_pct,
         })
     return scenarios
 
@@ -656,6 +658,8 @@ def local_ai_analyst(summary, insights, alerts, layout_scenarios, video_quality)
             "Evita contraluces, reflejos fuertes y camara en movimiento.",
             "Mantén personas completas dentro del encuadre en las zonas criticas.",
         ],
+        "video_quality_score": video_quality["score"],
+        "video_quality_label": video_quality["label"],
         "confidence": "Media",
     }
 
@@ -712,6 +716,8 @@ def openai_analyst_schema():
             },
             "video_quality_comment": {"type": "string"},
             "video_improvement_actions": {"type": "array", "items": {"type": "string"}},
+            "video_quality_score": {"type": "integer"},
+            "video_quality_label": {"type": "string"},
             "confidence": {"type": "string"},
         },
         "required": [
@@ -719,6 +725,8 @@ def openai_analyst_schema():
             "layout_recommendations",
             "video_quality_comment",
             "video_improvement_actions",
+            "video_quality_score",
+            "video_quality_label",
             "confidence",
         ],
     }
@@ -902,9 +910,11 @@ def openai_video_quality_schema():
         "properties": {
             "video_quality_comment": {"type": "string"},
             "video_improvement_actions": {"type": "array", "items": {"type": "string"}},
+            "video_quality_score": {"type": "integer"},
+            "video_quality_label": {"type": "string"},
             "confidence": {"type": "string"},
         },
-        "required": ["video_quality_comment", "video_improvement_actions", "confidence"],
+        "required": ["video_quality_comment", "video_improvement_actions", "video_quality_score", "video_quality_label", "confidence"],
     }
 
 
@@ -922,8 +932,9 @@ def openai_layout_schema():
                         "title": {"type": "string"},
                         "body": {"type": "string"},
                         "impact": {"type": "string"},
+                        "impact_pct": {"type": "integer"},
                     },
-                    "required": ["title", "body", "impact"],
+                    "required": ["title", "body", "impact", "impact_pct"],
                 },
             },
             "confidence": {"type": "string"},
@@ -954,8 +965,10 @@ def request_openai_video_quality_review(analysis, video_quality):
         openai_video_quality_schema(),
         (
             "Actua como especialista en vision computacional aplicada a analitica retail. "
-            "Evalua la calidad del video usando los metadatos y el frame adjunto. "
-            "Devuelve un comentario profesional y acciones concretas para mejorar captacion, iluminacion, angulo, enfoque y utilidad analitica."
+            "Evalua la calidad del video usando los metadatos y el frame adjunto con criterio exigente para deteccion de personas tipo YOLO. "
+            "Puntua oclusiones, blur, contraste, iluminacion, angulo, distancia a sujetos, ruido, reflejos y valor real para computer vision. "
+            "No entregues 100/100 salvo condiciones casi perfectas de laboratorio; ante dudas castiga el score. "
+            "Devuelve score 0-100, una etiqueta corta, un comentario profesional y acciones concretas para mejorar captacion, iluminacion, angulo, enfoque y utilidad analitica."
         ),
         payload,
         first_frame_data_url(analysis),
@@ -991,7 +1004,8 @@ def request_openai_layout_review(analysis, friction_data, layout_scenarios, aler
         (
             "Actua como analista senior de operaciones y layout. "
             "Con base en friccion, zonas y el frame adjunto, propone ajustes concretos de layout, circulacion, espera, acceso y redistribucion. "
-            "No inventes precision; prioriza recomendaciones accionables para un analista."
+            "Para cada recomendacion devuelve un porcentaje entero de reduccion estimada de friccion (impact_pct) distinto segun la evidencia; evita repetir siempre el mismo valor. "
+            "No inventes precision excesiva; prioriza recomendaciones accionables para un analista."
         ),
         payload,
         first_frame_data_url(analysis),
@@ -1532,6 +1546,8 @@ def dashboard_context(analysis=None, overview_analyses=None):
     if video_ai_payload and has_fresh_ai_payload(analysis, AI_VIDEO_QUALITY_CACHE_KEY):
         ai_analyst["video_quality_comment"] = video_ai_payload.get("video_quality_comment", ai_analyst["video_quality_comment"])
         ai_analyst["video_improvement_actions"] = video_ai_payload.get("video_improvement_actions", ai_analyst["video_improvement_actions"])
+        video_quality["score"] = max(0, min(100, safe_int(video_ai_payload.get("video_quality_score", video_quality["score"]))))
+        video_quality["label"] = video_ai_payload.get("video_quality_label", video_quality["label"])
         ai_analyst["source"] = video_ai_payload.get("source", ai_analyst["source"])
     layout_ai_payload, _layout_ai_note = cached_ai_payload(analysis, AI_LAYOUT_CACHE_KEY)
     if layout_ai_payload and has_fresh_ai_payload(analysis, AI_LAYOUT_CACHE_KEY):

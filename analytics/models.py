@@ -59,6 +59,10 @@ class AppConfiguration(models.Model):
 
 
 class AnalysisRun(models.Model):
+    class AnalysisType(models.TextChoices):
+        PEDESTRIAN = "pedestrian", "Establecimiento peatonal"
+        PARKING = "parking", "Estacionamiento"
+
     class Status(models.TextChoices):
         DRAFT = "draft", "Borrador"
         READY = "ready", "Listo"
@@ -69,6 +73,12 @@ class AnalysisRun(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=160, blank=True)
+    analysis_type = models.CharField(
+        max_length=20,
+        choices=AnalysisType.choices,
+        default=AnalysisType.PEDESTRIAN,
+        db_index=True,
+    )
     mall_group = models.ForeignKey(
         Mall,
         null=True,
@@ -119,6 +129,22 @@ class AnalysisRun(models.Model):
         if self.name:
             return self.name
         return Path(self.video.name).name
+
+    @property
+    def is_parking(self):
+        return self.analysis_type == self.AnalysisType.PARKING
+
+    @property
+    def domain_label(self):
+        return "Estacionamiento" if self.is_parking else "Establecimiento peatonal"
+
+    @property
+    def entity_label_plural(self):
+        return "vehiculos" if self.is_parking else "personas"
+
+    @property
+    def entity_label_singular(self):
+        return "vehiculo" if self.is_parking else "persona"
 
     @property
     def output_path(self):

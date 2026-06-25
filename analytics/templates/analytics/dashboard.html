@@ -124,6 +124,7 @@
         <h1 class="analysis-title">{{ analysis.display_name }}</h1>
         <div class="analysis-context">
           <span class="type-pill"><i data-lucide="user-check"></i>{{ user_role }}</span>
+          <span class="type-pill">{{ analysis.domain_label }}</span>
           <span class="type-pill">{{ analysis.mall_label|default:"Sin establecimiento" }}</span>
           <span class="type-pill">{{ analysis.category_label|default:"General" }}</span>
           <span class="type-pill">{{ analysis.area_label|default:"Sin sector" }}</span>
@@ -151,47 +152,47 @@
 
   <section class="kpi-grid">
     <article class="kpi kpi-blue">
-      <span>Personas validadas</span>
+      <span>{% if analysis.is_parking %}Vehiculos detectados{% else %}Personas validadas{% endif %}</span>
       <strong>{{ summary.total_people|default:"-" }}</strong>
-      <small>Tracks confirmados por persistencia</small>
+      <small>{% if analysis.is_parking %}Sesiones de ocupacion detectadas{% else %}Tracks confirmados por persistencia{% endif %}</small>
     </article>
     <article class="kpi kpi-green">
-      <span>Entradas a zonas</span>
+      <span>{% if analysis.is_parking %}Llegadas{% else %}Entradas a zonas{% endif %}</span>
       <strong>{{ summary.total_zone_entries|default:"0" }}</strong>
-      <small>Cruces con permanencia minima</small>
+      <small>{% if analysis.is_parking %}Ingresos a slots o areas de estacionamiento{% else %}Cruces con permanencia minima{% endif %}</small>
     </article>
     <article class="kpi kpi-amber">
-      <span>Actividad focal</span>
-      <strong>{{ summary.total_focus_activity|default:summary.total_zone_entries|default:"0" }}</strong>
-      <small>Interacciones acumuladas en zonas</small>
+      <span>{% if analysis.is_parking %}Slots libres finales{% else %}Actividad focal{% endif %}</span>
+      <strong>{% if analysis.is_parking %}{{ summary.slots_free|default:"0" }}{% else %}{{ summary.total_focus_activity|default:summary.total_zone_entries|default:"0" }}{% endif %}</strong>
+      <small>{% if analysis.is_parking %}Disponibilidad al cierre del video{% else %}Interacciones acumuladas en zonas{% endif %}</small>
     </article>
     <article class="kpi kpi-rose">
-      <span>Permanencia prom.</span>
+      <span>{% if analysis.is_parking %}Permanencia prom.{% else %}Permanencia prom.{% endif %}</span>
       <strong>{{ summary.avg_dwell_time|default:"-" }}</strong>
-      <small>Tiempo medio observado</small>
+      <small>{% if analysis.is_parking %}Tiempo medio por vehiculo estacionado{% else %}Tiempo medio observado{% endif %}</small>
     </article>
   </section>
 
   <section class="insight-grid">
     <article class="insight-card">
-      <span>Zona mas transitada</span>
+      <span>{% if analysis.is_parking %}Zona con mayor ocupacion{% else %}Zona mas transitada{% endif %}</span>
       <strong>{{ operational_insights.busiest_zone.label }}</strong>
-      <small>{{ operational_insights.busiest_zone.value }} eventos</small>
+      <small>{% if analysis.is_parking %}{{ operational_insights.busiest_zone.value }} ocupaciones / eventos{% else %}{{ operational_insights.busiest_zone.value }} eventos{% endif %}</small>
     </article>
     <article class="insight-card">
-      <span>Maximo de personas</span>
+      <span>{% if analysis.is_parking %}Peak de slots ocupados{% else %}Maximo de personas{% endif %}</span>
       <strong>{{ operational_insights.max_people.value }}</strong>
       <small>{{ operational_insights.max_people.label }}</small>
     </article>
     <article class="insight-card">
-      <span>Horario peak</span>
+      <span>{% if analysis.is_parking %}Horario peak{% else %}Horario peak{% endif %}</span>
       <strong>{{ operational_insights.peak_time.label }}</strong>
-      <small>{{ operational_insights.peak_time.value }} eventos</small>
+      <small>{% if analysis.is_parking %}{{ operational_insights.peak_time.value }} llegadas / ocupaciones{% else %}{{ operational_insights.peak_time.value }} eventos{% endif %}</small>
     </article>
     <article class="insight-card">
-      <span>Horario minimo</span>
+      <span>{% if analysis.is_parking %}Horario de menor ocupacion{% else %}Horario minimo{% endif %}</span>
       <strong>{{ operational_insights.quiet_time.label }}</strong>
-      <small>{{ operational_insights.quiet_time.value }} eventos</small>
+      <small>{% if analysis.is_parking %}{{ operational_insights.quiet_time.value }} slots ocupados / eventos{% else %}{{ operational_insights.quiet_time.value }} eventos{% endif %}</small>
     </article>
   </section>
 
@@ -316,19 +317,19 @@
     </article>
 
     <article class="panel">
-      <div class="panel-title"><h2>Ranking operativo</h2></div>
+      <div class="panel-title"><h2>{% if analysis.is_parking %}Ranking de ocupacion por zona{% else %}Ranking operativo{% endif %}</h2></div>
       <canvas id="rankingChart" height="260"></canvas>
     </article>
 
     <article class="panel">
-      <div class="panel-title"><h2>Flujo temporal</h2></div>
+      <div class="panel-title"><h2>{% if analysis.is_parking %}Ocupacion temporal{% else %}Flujo temporal{% endif %}</h2></div>
       <canvas id="timeChart" height="250"></canvas>
     </article>
 
     <article class="panel zone-3d-panel">
       <div class="panel-title">
         <h2>Actividad 3D por horario</h2>
-        <span>Zona x hora x eventos</span>
+        <span>{% if analysis.is_parking %}Zona x hora x ocupacion{% else %}Zona x hora x eventos{% endif %}</span>
       </div>
       <div id="zone3dChart" class="plotly-panel"></div>
       <div id="zone3dHoverReadout" class="chart-hover-readout">
@@ -338,7 +339,7 @@
     </article>
 
     <article class="panel">
-      <div class="panel-title"><h2>Direccionalidad</h2></div>
+      <div class="panel-title"><h2>{% if analysis.is_parking %}Llegadas y salidas{% else %}Direccionalidad{% endif %}</h2></div>
       <canvas id="stairsChart" height="250"></canvas>
     </article>
   </section>
@@ -529,7 +530,7 @@
 
   <section class="panel data-panel">
     <div class="panel-title">
-      <h2>Detalle por zona</h2>
+      <h2>{% if analysis.is_parking %}Detalle por zona y ocupacion{% else %}Detalle por zona{% endif %}</h2>
       <span>{{ zone_rows|length }} registros</span>
     </div>
     {% if zone_rows %}
@@ -627,8 +628,8 @@
       data: {
         labels: chartData.time.map(row => row.clock || row.label),
         datasets: [
-          { label: "Personas", data: chartData.time.map(row => row.visible), borderColor: "#2563eb", backgroundColor: "rgba(37,99,235,.14)", tension: .28, fill: true },
-          { label: "Eventos", data: chartData.time.map(row => row.events), borderColor: "#D6FF72", tension: .28 }
+          { label: "{% if analysis.is_parking %}Slots ocupados{% else %}Personas{% endif %}", data: chartData.time.map(row => row.visible), borderColor: "#2563eb", backgroundColor: "rgba(37,99,235,.14)", tension: .28, fill: true },
+          { label: "{% if analysis.is_parking %}Llegadas / salidas{% else %}Eventos{% endif %}", data: chartData.time.map(row => row.events), borderColor: "#D6FF72", tension: .28 }
         ]
       },
       options: {
@@ -650,7 +651,7 @@
     const zone3dNode = document.getElementById("zone3dChart");
     const zone3dReadout = document.getElementById("zone3dHoverReadout");
     const hoverText = surface.z.map((row, zoneIndex) => row.map((value, timeIndex) => {
-      return `Horario: ${surfaceTimes[timeIndex]} · Intervalo: ${surface.times[timeIndex]} · Zona: ${surface.zones[zoneIndex]} · Eventos: ${value}`;
+      return `Horario: ${surfaceTimes[timeIndex]} · Intervalo: ${surface.times[timeIndex]} · Zona: ${surface.zones[zoneIndex]} · {% if analysis.is_parking %}Ocupacion{% else %}Eventos{% endif %}: ${value}`;
     }));
     Plotly.newPlot(zone3dNode, [{
       type: "surface",
@@ -659,7 +660,7 @@
       z: surface.z,
       colorscale: [[0, "#07111f"], [0.4, "#2563eb"], [0.75, "#38bdf8"], [1, "#d6ff72"]],
       contours: { z: { show: true, usecolormap: true, highlightcolor: "#ffffff", project: { z: true } } },
-      colorbar: { title: "Eventos" },
+      colorbar: { title: "{% if analysis.is_parking %}Ocupacion{% else %}Eventos{% endif %}" },
       hoverinfo: "text",
       hovertemplate: "%{text}<extra></extra>",
       text: hoverText,
@@ -671,7 +672,7 @@
       scene: {
         xaxis: { title: { text: "Hora", standoff: 22 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 }, tickmode: "array", tickvals: surfaceSeconds, ticktext: surfaceTimes },
         yaxis: { title: { text: "Zona", standoff: 26 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 }, tickmode: "array", tickvals: surface.zones.map((_, index) => index), ticktext: surface.zones },
-        zaxis: { title: { text: "Eventos", standoff: 18 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 } },
+        zaxis: { title: { text: "{% if analysis.is_parking %}Ocupacion{% else %}Eventos{% endif %}", standoff: 18 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 } },
         aspectratio: { x: 1.45, y: 1, z: 0.72 },
         camera: { eye: { x: 1.65, y: 1.35, z: 1.05 } }
       },
@@ -681,7 +682,7 @@
       const point = event.points?.[0];
       if (!point || !zone3dReadout) return;
       const data = point.customdata || [];
-      zone3dReadout.innerHTML = `<i data-lucide="clock-3"></i><span>Horario ${data[0] || point.x} · ${data[1] || "Zona"} · ${point.z ?? 0} eventos</span>`;
+      zone3dReadout.innerHTML = `<i data-lucide="clock-3"></i><span>Horario ${data[0] || point.x} · ${data[1] || "Zona"} · ${point.z ?? 0} {% if analysis.is_parking %}ocupacion{% else %}eventos{% endif %}</span>`;
       if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
     });
   } else {
@@ -695,8 +696,8 @@
       data: {
         labels: chartData.stairs.map(row => row.label),
         datasets: [
-          { label: "Suben", data: chartData.stairs.map(row => row.up), backgroundColor: "#2563eb", borderRadius: 4 },
-          { label: "Bajan", data: chartData.stairs.map(row => row.down), backgroundColor: "#FF5F7A", borderRadius: 4 }
+          { label: "{% if analysis.is_parking %}Llegadas{% else %}Suben{% endif %}", data: chartData.stairs.map(row => row.up), backgroundColor: "#2563eb", borderRadius: 4 },
+          { label: "{% if analysis.is_parking %}Salidas{% else %}Bajan{% endif %}", data: chartData.stairs.map(row => row.down), backgroundColor: "#FF5F7A", borderRadius: 4 }
         ]
       },
       options: { responsive: true, plugins: { legend: { position: "bottom" } }, scales: { y: { beginAtZero: true } } }

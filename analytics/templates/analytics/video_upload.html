@@ -13,10 +13,10 @@
 </header>
 
 <section class="workflow">
-  <span class="active">Video</span>
-  <span>Zonas</span>
-  <span>Analisis</span>
-  <span>Ver resultado</span>
+  <span class="workflow-step is-active"><span>Video</span></span>
+  <span class="workflow-step is-disabled"><span>Zonas</span></span>
+  <span class="workflow-step is-disabled"><span>Analisis</span></span>
+  <span class="workflow-step is-disabled"><span>Ver resultado</span></span>
 </section>
 
 <section class="form-layout">
@@ -24,6 +24,19 @@
     {% csrf_token %}
     <div class="panel-title"><h2>Metadatos del analisis</h2></div>
     {{ form.non_field_errors }}
+    <label>Tipo de analisis</label>
+    <div class="analysis-type-toggle">
+      {% for radio in form.analysis_type %}
+        <label>
+          {{ radio.tag }}
+          <span class="analysis-type-option">
+            <strong>{{ radio.choice_label }}</strong>
+            <small>{% if forloop.first %}Detecta flujo peatonal, permanencia, zonas calientes y comportamiento por area.{% else %}Detecta vehiculos, genera slots desde una muestra del video y analiza ocupacion cenital.{% endif %}</small>
+          </span>
+        </label>
+      {% endfor %}
+    </div>
+    {{ form.analysis_type.errors }}
     <label for="{{ form.name.id_for_label }}">Nombre</label>
     {{ form.name }}
     {{ form.name.errors }}

@@ -6,8 +6,9 @@ from .models import AnalysisRun, AppConfiguration, Mall
 class VideoUploadForm(forms.ModelForm):
     class Meta:
         model = AnalysisRun
-        fields = ["name", "mall", "category", "area", "video"]
+        fields = ["analysis_type", "name", "mall", "category", "area", "video"]
         labels = {
+            "analysis_type": "Tipo de analisis",
             "name": "Nombre del analisis",
             "mall": "Establecimiento",
             "category": "Categoria",
@@ -15,6 +16,7 @@ class VideoUploadForm(forms.ModelForm):
             "video": "Video",
         }
         widgets = {
+            "analysis_type": forms.RadioSelect(),
             "name": forms.TextInput(attrs={"placeholder": "Ej: Pasillo norte - viernes 18:00"}),
             "mall": forms.TextInput(attrs={"placeholder": "Ej: Edificio Central"}),
             "category": forms.TextInput(attrs={"placeholder": "Ej: Accesos / Salas / Operacion"}),

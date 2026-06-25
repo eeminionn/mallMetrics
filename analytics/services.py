@@ -21,6 +21,7 @@ REPORT_FILES = {
     "database": "analysis_results.sqlite3",
     "heatmap": "heatmap_final.png",
     "summary": "analytics_summary.csv",
+    "parking_summary": "parking_summary.csv",
     "zones": "reporte_zonas.csv",
     "zone_metrics": "zone_metrics.csv",
     "stores": "store_metrics.csv",
@@ -29,12 +30,15 @@ REPORT_FILES = {
     "events": "zone_events.csv",
     "people": "person_tracks.csv",
     "dwell": "dwell_times.csv",
+    "parking_slots": "parking_slots.csv",
+    "parking_sessions": "parking_sessions.csv",
 }
 
 REPORT_LABELS = {
     "database": "Base de datos",
     "heatmap": "Mapa de calor",
     "summary": "Resumen",
+    "parking_summary": "Resumen parking",
     "zones": "Zonas configuradas",
     "zone_metrics": "Metricas por zona",
     "stores": "Actividad focal",
@@ -43,6 +47,8 @@ REPORT_LABELS = {
     "events": "Eventos",
     "people": "Tracks de personas",
     "dwell": "Permanencia",
+    "parking_slots": "Slots de estacionamiento",
+    "parking_sessions": "Sesiones por slot",
 }
 
 AI_ANALYST_CACHE_KEY = "ai_analyst_v1"
@@ -1160,6 +1166,17 @@ def stair_rows_for_chart(stair_rows):
     ]
 
 
+def parking_flow_rows(time_rows):
+    return [
+        {
+            "label": row.get("time_label") or row.get("interval") or "Intervalo",
+            "up": safe_int(row.get("arrivals")),
+            "down": safe_int(row.get("departures")),
+        }
+        for row in time_rows[:8]
+    ]
+
+
 def latest_relevant_analysis():
     completed = AnalysisRun.objects.filter(status=AnalysisRun.Status.COMPLETED).first()
     if completed:
@@ -1533,7 +1550,7 @@ def dashboard_context(analysis=None, overview_analyses=None):
         "trafficSurface": traffic_surface_payload(analysis, zone_rows, zone_metric_rows, time_rows, event_rows),
         "friction": friction_rows(zone_metric_rows, zone_rows),
         "clusters": trajectory_cluster_rows(people_rows),
-        "stairs": stair_rows_for_chart(stair_rows),
+        "stairs": parking_flow_rows(time_rows) if analysis.is_parking else stair_rows_for_chart(stair_rows),
     }
     insights = operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event_rows)
     video_quality = video_quality_score(analysis)

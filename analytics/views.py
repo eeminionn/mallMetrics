@@ -220,6 +220,28 @@ def normalize_zones(raw_zones, frame_width, frame_height):
     return zones
 
 
+def default_parking_zone(frame_width, frame_height):
+    margin_x = max(24, int(frame_width * 0.06))
+    margin_y = max(24, int(frame_height * 0.08))
+    return {
+        "id": "estacionamiento_1",
+        "name": "Estacionamiento principal",
+        "type": "estacionamiento",
+        "type_label": "ESTACIONAMIENTO",
+        "hex": "#60A5FA",
+        "points": [
+            {"x": margin_x, "y": margin_y},
+            {"x": frame_width - margin_x, "y": margin_y},
+            {"x": frame_width - margin_x, "y": frame_height - margin_y},
+            {"x": margin_x, "y": frame_height - margin_y},
+        ],
+        "x1": margin_x,
+        "y1": margin_y,
+        "x2": frame_width - margin_x,
+        "y2": frame_height - margin_y,
+    }
+
+
 def resolve_mall_group(name):
     normalized = str(name or "").strip()
     if not normalized:
@@ -336,7 +358,7 @@ def video_upload(request):
                 return redirect("analysis_list")
             return redirect("zone_editor", pk=analysis.pk)
     else:
-        form = VideoUploadForm()
+        form = VideoUploadForm(initial={"analysis_type": AnalysisRun.AnalysisType.PEDESTRIAN})
 
     return render(request, "analytics/video_upload.html", {
         "form": form,
@@ -377,11 +399,18 @@ def zone_editor(request, pk):
         audit_event(request, AnalysisAuditLog.Action.ZONES_SAVE, analysis=analysis, mall=analysis.mall_group, zones=len(zones), version=next_version)
         return redirect("analysis_status", pk=analysis.pk)
 
+    if analysis.is_parking and not analysis.zones and analysis.frame_width and analysis.frame_height:
+        analysis.zones = [default_parking_zone(analysis.frame_width, analysis.frame_height)]
+        analysis.save(update_fields=["zones", "updated_at"])
+
+    allowed_types = {"estacionamiento"} if analysis.is_parking else {"zona"}
     zone_styles = {
         key: {"label": value["label"], "hex": value["hex"]}
         for key, value in ZONE_STYLES.items()
-        if key in {"zona"}
+        if key in allowed_types
     }
+    if analysis.is_parking and "estacionamiento" not in zone_styles:
+        zone_styles["estacionamiento"] = {"label": "ESTACIONAMIENTO", "hex": "#60A5FA"}
     for zone in analysis.zones or []:
         zone_type = normalize_zone_type(zone.get("type", "zona"))
         if zone_type not in zone_styles:
@@ -396,6 +425,7 @@ def zone_editor(request, pk):
         "zone_styles": json.dumps(zone_styles),
         "zones_json": json.dumps(analysis.zones),
         "frame_url": analysis.first_frame.url if analysis.first_frame else "",
+        "initial_zone_type": "estacionamiento" if analysis.is_parking else "zona",
     })
 
 

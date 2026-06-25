@@ -644,24 +644,72 @@
     }
 
     .workflow {
-      @apply mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4;
+      @apply mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
     }
 
-    .workflow a,
-    .workflow span {
-      @apply grid min-h-10 place-items-center rounded-full border border-line bg-panel px-3 text-center text-sm font-semibold text-muted transition;
+    .workflow-step {
+      @apply relative grid min-h-14 place-items-center overflow-hidden rounded-full border border-line bg-panel px-4 text-center text-sm font-semibold text-muted transition duration-200;
     }
 
-    .workflow a:hover {
-      @apply border-[#2563eb] bg-[#081226] text-copy;
+    .workflow-step::before {
+      content: "";
+      @apply absolute inset-y-0 left-0 rounded-full bg-signal/16 opacity-0 transition duration-300;
+      width: var(--workflow-progress, 0%);
     }
 
-    .workflow .active {
-      @apply border-signal bg-signal text-white;
+    .workflow-step > span {
+      @apply relative z-[1];
     }
 
-    .workflow .disabled {
+    .workflow a.workflow-step:hover {
+      @apply border-[#2563eb] text-copy;
+      background: rgba(8, 18, 38, 0.9);
+    }
+
+    .workflow-step.is-complete {
+      @apply border-[#2f5fd0] text-copy;
+      --workflow-progress: 100%;
+    }
+
+    .workflow-step.is-active {
+      @apply border-signal text-white;
+      --workflow-progress: 100%;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.18), 0 10px 24px rgba(37, 99, 235, 0.18);
+      animation: workflowPulse 2.2s ease-in-out infinite;
+    }
+
+    .workflow-step.is-disabled {
       @apply bg-carbon text-[#64748b];
+    }
+
+    @keyframes workflowPulse {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-1px); }
+    }
+
+    .analysis-type-toggle {
+      @apply mb-4 grid gap-3 md:grid-cols-2;
+    }
+
+    .analysis-type-toggle input[type="radio"] {
+      @apply sr-only;
+    }
+
+    .analysis-type-option {
+      @apply flex min-h-20 cursor-pointer flex-col justify-center gap-1 rounded-lg border border-line bg-panel-2 px-4 py-4 text-left transition duration-150;
+    }
+
+    .analysis-type-option strong {
+      @apply text-sm font-semibold text-copy;
+    }
+
+    .analysis-type-option small {
+      @apply text-xs leading-5 text-muted;
+    }
+
+    .analysis-type-toggle input[type="radio"]:checked + .analysis-type-option {
+      @apply border-signal bg-[#0d1c3a];
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.24), 0 14px 30px rgba(37, 99, 235, 0.18);
     }
 
     .form-layout,

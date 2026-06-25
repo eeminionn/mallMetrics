@@ -16,6 +16,7 @@ from config import (
     heatmap_output_file,
     iou_value,
     model_name,
+    parking_model_name,
     tracker_type,
     zone_report_file,
 )
@@ -33,6 +34,10 @@ time_bins_file = "time_bins.csv"
 stair_metrics_file = "stair_metrics.csv"
 zones_config_file = "zonas_configuradas.json"
 analytics_database_file = "analysis_results.sqlite3"
+parking_slots_file = "parking_slots.csv"
+parking_sessions_file = "parking_sessions.csv"
+parking_summary_file = "parking_summary.csv"
+vehicle_class_ids = {2, 3, 5, 7}
 
 tracking_confidence = max(float(confidence), 0.40)
 min_confirmed_frames = 8
@@ -137,6 +142,9 @@ def build_results_database(output_dir, analysis_id, video_path, zones):
         time_bins_file,
         stair_metrics_file,
         zone_report_file,
+        parking_slots_file,
+        parking_sessions_file,
+        parking_summary_file,
     ]
     asset_files = [heatmap_output_file, zones_config_file]
 
@@ -653,6 +661,495 @@ def fail_analysis(analysis_id, message):
     )
 
 
+def slot_center(slot):
+    return ((slot["x1"] + slot["x2"]) / 2.0, (slot["y1"] + slot["y2"]) / 2.0)
+
+
+def point_inside_rect(x, y, rect):
+    return rect["x1"] <= x <= rect["x2"] and rect["y1"] <= y <= rect["y2"]
+
+
+def parking_zone_slots(zone, sample_box):
+    zone_width = max(1, zone["x2"] - zone["x1"])
+    zone_height = max(1, zone["y2"] - zone["y1"])
+    sample_w = max(24.0, sample_box["w"])
+    sample_h = max(24.0, sample_box["h"])
+    horizontal = zone_width >= zone_height
+
+    slot_long = max(sample_w, sample_h) * 1.08
+    slot_short = min(sample_w, sample_h) * 1.18
+    if horizontal:
+        slot_w, slot_h = slot_long, slot_short
+    else:
+        slot_w, slot_h = slot_short, slot_long
+
+    cols = max(1, int(zone_width // max(slot_w, 1)))
+    rows = max(1, int(zone_height // max(slot_h, 1)))
+    effective_slot_w = zone_width / cols
+    effective_slot_h = zone_height / rows
+
+    slots = []
+    for row in range(rows):
+        for col in range(cols):
+            x1 = int(zone["x1"] + col * effective_slot_w)
+            y1 = int(zone["y1"] + row * effective_slot_h)
+            x2 = int(zone["x1"] + (col + 1) * effective_slot_w)
+            y2 = int(zone["y1"] + (row + 1) * effective_slot_h)
+            slots.append({
+                "slot_id": f"{zone['id']}_slot_{row + 1:02d}_{col + 1:02d}",
+                "zone_id": zone["id"],
+                "zone_name": display_zone_label(zone),
+                "row": row + 1,
+                "col": col + 1,
+                "x1": x1,
+                "y1": y1,
+                "x2": x2,
+                "y2": y2,
+            })
+    return slots
+
+
+def export_parking_analytics(
+    output_dir,
+    fps,
+    total_frames,
+    frame_width,
+    frame_height,
+    zones,
+    slots,
+    slot_sessions,
+    time_bins,
+    peak_occupied_slots,
+    unique_vehicles,
+):
+    output_dir = Path(output_dir)
+    total_slots = len(slots)
+    arrivals = len(slot_sessions)
+    departures = sum(1 for session in slot_sessions if session.get("departed"))
+    dwell_seconds = [session["duration_seconds"] for session in slot_sessions if session.get("duration_seconds", 0) > 0]
+    avg_dwell = sum(dwell_seconds) / len(dwell_seconds) if dwell_seconds else 0
+    occupancy_samples = [row["occupied_slots"] for row in time_bins if row.get("samples")]
+    avg_occupied = sum(occupancy_samples) / len(occupancy_samples) if occupancy_samples else 0
+    occupancy_rate = (avg_occupied / total_slots * 100) if total_slots else 0
+    current_occupied = time_bins[-1]["occupied_slots"] if time_bins else 0
+    free_slots = max(total_slots - current_occupied, 0)
+
+    summary_row = {
+        "total_people": unique_vehicles,
+        "total_zone_entries": arrivals,
+        "total_focus_activity": departures,
+        "avg_dwell_time": format_seconds(avg_dwell),
+        "flow_heatmap_points": int(sum(occupancy_samples)),
+        "slots_total": total_slots,
+        "slots_free": free_slots,
+        "peak_occupied_slots": peak_occupied_slots,
+        "avg_occupancy_rate": round(occupancy_rate, 1),
+        "avg_dwell_seconds": round(avg_dwell, 1),
+    }
+    write_csv_file(output_dir / analytics_summary_file, list(summary_row.keys()), [summary_row])
+    write_csv_file(output_dir / parking_summary_file, list(summary_row.keys()), [summary_row])
+
+    zone_rows = []
+    for zone in zones:
+        zone_slots = [slot for slot in slots if slot["zone_id"] == zone["id"]]
+        zone_sessions = [session for session in slot_sessions if session["zone_id"] == zone["id"]]
+        zone_peak = max((row["occupied_slots"] for row in time_bins if row["zone_id"] == zone["id"]), default=0)
+        zone_avg_dwell = sum(session["duration_seconds"] for session in zone_sessions) / len(zone_sessions) if zone_sessions else 0
+        zone_rows.append({
+            "zone_id": zone["id"],
+            "zone_name": display_zone_label(zone),
+            "zone_type": zone["type"],
+            "entry_count": len(zone_sessions),
+            "exit_count": sum(1 for session in zone_sessions if session.get("departed")),
+            "unique_people_count": len(zone_sessions),
+            "avg_dwell_time_seconds": round(zone_avg_dwell, 1),
+            "avg_dwell_time_formatted": format_seconds(zone_avg_dwell),
+            "slots_total": len(zone_slots),
+            "peak_occupied_slots": zone_peak,
+        })
+    write_csv_file(output_dir / zone_metrics_file, list(zone_rows[0].keys()) if zone_rows else [
+        "zone_id", "zone_name", "zone_type", "entry_count", "exit_count", "unique_people_count", "avg_dwell_time_seconds",
+        "avg_dwell_time_formatted", "slots_total", "peak_occupied_slots",
+    ], zone_rows)
+
+    slot_rows = []
+    for slot in slots:
+        sessions = [session for session in slot_sessions if session["slot_id"] == slot["slot_id"]]
+        occupied_seconds = sum(session["duration_seconds"] for session in sessions)
+        slot_rows.append({
+            "slot_id": slot["slot_id"],
+            "zone_id": slot["zone_id"],
+            "zone_name": slot["zone_name"],
+            "row": slot["row"],
+            "col": slot["col"],
+            "occupied_count": len(sessions),
+            "occupied_seconds": round(occupied_seconds, 1),
+            "avg_dwell_seconds": round((occupied_seconds / len(sessions)) if sessions else 0, 1),
+            "x1": slot["x1"],
+            "y1": slot["y1"],
+            "x2": slot["x2"],
+            "y2": slot["y2"],
+        })
+    write_csv_file(output_dir / parking_slots_file, list(slot_rows[0].keys()) if slot_rows else [
+        "slot_id", "zone_id", "zone_name", "row", "col", "occupied_count", "occupied_seconds", "avg_dwell_seconds", "x1", "y1", "x2", "y2",
+    ], slot_rows)
+
+    session_rows = []
+    dwell_rows = []
+    person_rows = []
+    event_rows = []
+    for index, session in enumerate(slot_sessions, start=1):
+        vehicle_label = f"vehiculo_{index}"
+        session_rows.append({
+            "vehicle_id": index,
+            "vehicle_label": vehicle_label,
+            "slot_id": session["slot_id"],
+            "zone_id": session["zone_id"],
+            "zone_name": session["zone_name"],
+            "arrival_seconds": round(session["arrival_seconds"], 2),
+            "departure_seconds": round(session["departure_seconds"], 2) if session.get("departure_seconds") is not None else "",
+            "duration_seconds": round(session["duration_seconds"], 2),
+            "duration_formatted": format_seconds(session["duration_seconds"]),
+            "departed": int(bool(session.get("departed"))),
+        })
+        dwell_rows.append({
+            "person_id": index,
+            "person_label": vehicle_label,
+            "zone_id": session["zone_id"],
+            "zone_name": session["zone_name"],
+            "duration_seconds": round(session["duration_seconds"], 2),
+            "duration_formatted": format_seconds(session["duration_seconds"]),
+        })
+        person_rows.append({
+            "person_id": index,
+            "person_label": vehicle_label,
+            "first_zone": session["zone_name"],
+            "last_zone": session["zone_name"],
+            "visible_time_seconds": round(session["duration_seconds"], 2),
+            "distance_px": 0,
+            "zones_visited": session["zone_name"],
+            "zones_visited_count": 1,
+        })
+        event_rows.append({
+            "event_type": "vehicle_arrival",
+            "person_id": index,
+            "person_label": vehicle_label,
+            "time_seconds": round(session["arrival_seconds"], 2),
+            "frame_index": session["arrival_frame"],
+            "x": session["x"],
+            "y": session["y"],
+            "zone_id": session["zone_id"],
+            "zone_name": session["zone_name"],
+            "store_name": "",
+            "extra": session["slot_id"],
+        })
+        if session.get("departure_seconds") is not None:
+            event_rows.append({
+                "event_type": "vehicle_departure",
+                "person_id": index,
+                "person_label": vehicle_label,
+                "time_seconds": round(session["departure_seconds"], 2),
+                "frame_index": session["departure_frame"],
+                "x": session["x"],
+                "y": session["y"],
+                "zone_id": session["zone_id"],
+                "zone_name": session["zone_name"],
+                "store_name": "",
+                "extra": session["slot_id"],
+            })
+
+    write_csv_file(output_dir / parking_sessions_file, list(session_rows[0].keys()) if session_rows else [
+        "vehicle_id", "vehicle_label", "slot_id", "zone_id", "zone_name", "arrival_seconds", "departure_seconds", "duration_seconds", "duration_formatted", "departed",
+    ], session_rows)
+    write_csv_file(output_dir / dwell_times_file, list(dwell_rows[0].keys()) if dwell_rows else [
+        "person_id", "person_label", "zone_id", "zone_name", "duration_seconds", "duration_formatted",
+    ], dwell_rows)
+    write_csv_file(output_dir / person_tracks_file, list(person_rows[0].keys()) if person_rows else [
+        "person_id", "person_label", "first_zone", "last_zone", "visible_time_seconds", "distance_px", "zones_visited", "zones_visited_count",
+    ], person_rows)
+    write_csv_file(output_dir / zone_events_file, list(event_rows[0].keys()) if event_rows else [
+        "event_type", "person_id", "person_label", "time_seconds", "frame_index", "x", "y", "zone_id", "zone_name", "store_name", "extra",
+    ], event_rows)
+    write_csv_file(output_dir / store_metrics_file, ["store_name", "exterior_traffic", "door_crossings", "estimated_entries"], [])
+    write_csv_file(output_dir / stair_metrics_file, ["stair_id", "stair_name", "up_count", "down_count", "total_usage", "unique_people_count", "up_down_ratio"], [])
+
+    time_rows = []
+    for row in time_bins:
+        avg_occupied_slots = (row["occupied_sum"] / row["samples"]) if row["samples"] else row["occupied_slots"]
+        free_now = max(total_slots - row["occupied_slots"], 0)
+        time_rows.append({
+            "interval_start_seconds": row["start_seconds"],
+            "interval_end_seconds": row["end_seconds"],
+            "time_label": f"{format_seconds(row['start_seconds'])} - {format_seconds(row['end_seconds'])}",
+            "visible_count": round(avg_occupied_slots, 2),
+            "entries": row["arrivals"],
+            "events": row["arrivals"] + row["departures"],
+            "occupied_slots": row["occupied_slots"],
+            "free_slots": free_now,
+            "arrivals": row["arrivals"],
+            "departures": row["departures"],
+        })
+    write_csv_file(output_dir / time_bins_file, list(time_rows[0].keys()) if time_rows else [
+        "interval_start_seconds", "interval_end_seconds", "time_label", "visible_count", "entries", "events", "occupied_slots", "free_slots", "arrivals", "departures",
+    ], time_rows)
+
+
+def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
+    video_path = str(Path(analysis.video.path))
+    zones = [
+        vision_utils.normalize_zone_geometry(zone.copy(), analysis.frame_width, analysis.frame_height)
+        for zone in analysis.zones
+    ]
+    if not zones:
+        fail_analysis(analysis.pk, "Debes configurar al menos una zona de estacionamiento antes de iniciar.")
+        return
+
+    with (output_dir / zones_config_file).open("w", encoding="utf-8") as file:
+        json.dump({
+            "video": video_path,
+            "frame_width": analysis.frame_width,
+            "frame_height": analysis.frame_height,
+            "zones": zones,
+        }, file, indent=2, ensure_ascii=False)
+
+    update_analysis(analysis.pk, status_message="Cargando modelo YOLO para vehiculos")
+    model = YOLO(parking_model_name)
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        fail_analysis(analysis.pk, f"No se pudo abrir el video: {video_path}")
+        return
+
+    ok, first_frame = cap.read()
+    if not ok:
+        cap.release()
+        fail_analysis(analysis.pk, "No se pudo leer el primer frame del video.")
+        return
+
+    frame_height, frame_width = first_frame.shape[:2]
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+    def vehicle_detections(frame):
+        detections = []
+        results = model(frame, verbose=False, conf=max(tracking_confidence, 0.20), iou=iou_value)
+        if not results:
+            return detections
+        boxes = results[0].boxes
+        if boxes is None:
+            return detections
+        for box in boxes:
+            cls_id = int(box.cls[0].item()) if box.cls is not None else -1
+            if cls_id not in vehicle_class_ids:
+                continue
+            x1, y1, x2, y2 = [float(value) for value in box.xyxy[0].tolist()]
+            conf_score = float(box.conf[0].item()) if box.conf is not None else 0.0
+            detections.append({
+                "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+                "w": max(1.0, x2 - x1), "h": max(1.0, y2 - y1),
+                "cx": (x1 + x2) / 2.0, "cy": (y1 + y2) / 2.0,
+                "conf": conf_score,
+            })
+        return detections
+
+    initial_detections = vehicle_detections(first_frame)
+    slot_specs = []
+    for zone in zones:
+        inside = [det for det in initial_detections if vision_utils.point_inside_zone(det["cx"], det["cy"], zone)]
+        sample = max(inside, key=lambda det: det["conf"], default=None)
+        if sample is None:
+            zone_w = max(80, zone["x2"] - zone["x1"])
+            zone_h = max(80, zone["y2"] - zone["y1"])
+            sample = {"w": max(38, zone_w / 6), "h": max(28, zone_h / 2.4)}
+        slot_specs.extend(parking_zone_slots(zone, sample))
+    if not slot_specs:
+        fail_analysis(analysis.pk, "No se pudieron generar slots de estacionamiento a partir de las zonas.")
+        return
+
+    slot_state = {
+        slot["slot_id"]: {
+            "occupied": False,
+            "current_session": None,
+        }
+        for slot in slot_specs
+    }
+    slot_sessions = []
+    heatmap = np.zeros((frame_height, frame_width), dtype=np.float32)
+    frame_count = 0
+    best_frame = None
+    best_occupied = -1
+    peak_occupied_slots = 0
+    preview_path = output_dir / "preview_frame.jpg"
+    preview_interval = max(display_every_n_frames * 5, 5)
+    preview_max_width = 1440
+    processing_started_at = time.perf_counter()
+    time_bins = []
+    current_bin = None
+
+    def ensure_time_bin(current_time):
+        nonlocal current_bin
+        bin_start = int(current_time // time_bin_seconds) * time_bin_seconds
+        if current_bin is None or current_bin["start_seconds"] != bin_start:
+            current_bin = {
+                "start_seconds": bin_start,
+                "end_seconds": bin_start + time_bin_seconds,
+                "occupied_sum": 0.0,
+                "occupied_slots": 0,
+                "samples": 0,
+                "arrivals": 0,
+                "departures": 0,
+                "zone_id": zones[0]["id"] if zones else "",
+            }
+            time_bins.append(current_bin)
+        return current_bin
+
+    update_analysis(analysis.pk, status_message="Analizando ocupacion de estacionamientos")
+    while True:
+        if should_cancel(analysis.pk):
+            cap.release()
+            update_analysis(
+                analysis.pk,
+                status=AnalysisRun.Status.CANCELED,
+                progress=0,
+                status_message="Analisis cancelado",
+                finished_at=timezone.now(),
+            )
+            return
+
+        ok, frame = cap.read()
+        if not ok:
+            break
+        frame_count += 1
+        current_time = frame_count / fps if fps else 0
+        bin_row = ensure_time_bin(current_time)
+        detections = vehicle_detections(frame)
+
+        occupied_now = set()
+        arrivals = 0
+        departures = 0
+
+        for slot in slot_specs:
+            matching = [det for det in detections if point_inside_rect(det["cx"], det["cy"], slot)]
+            state = slot_state[slot["slot_id"]]
+            if matching:
+                det = max(matching, key=lambda item: item["conf"])
+                occupied_now.add(slot["slot_id"])
+                if not state["occupied"]:
+                    arrivals += 1
+                    state["occupied"] = True
+                    state["current_session"] = {
+                        "slot_id": slot["slot_id"],
+                        "zone_id": slot["zone_id"],
+                        "zone_name": slot["zone_name"],
+                        "arrival_seconds": current_time,
+                        "arrival_frame": frame_count,
+                        "x": round(det["cx"], 1),
+                        "y": round(det["cy"], 1),
+                        "departed": False,
+                    }
+                overlay_color = (96, 165, 250)
+                cv2.rectangle(frame, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), overlay_color, 2)
+                cv2.rectangle(heatmap, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), 1.0, -1)
+            else:
+                if state["occupied"] and state["current_session"] is not None:
+                    departures += 1
+                    session = state["current_session"]
+                    session["departure_seconds"] = current_time
+                    session["departure_frame"] = frame_count
+                    session["duration_seconds"] = max(0, current_time - session["arrival_seconds"])
+                    session["departed"] = True
+                    slot_sessions.append(session)
+                    state["current_session"] = None
+                state["occupied"] = False
+                cv2.rectangle(frame, (slot["x1"], slot["y1"]), (slot["x2"], slot["y2"]), (80, 88, 105), 1)
+
+        occupied_count = len(occupied_now)
+        peak_occupied_slots = max(peak_occupied_slots, occupied_count)
+        bin_row["occupied_sum"] += occupied_count
+        bin_row["occupied_slots"] = occupied_count
+        bin_row["samples"] += 1
+        bin_row["arrivals"] += arrivals
+        bin_row["departures"] += departures
+
+        for zone in zones:
+            cv2.putText(
+                frame,
+                f"{display_zone_label(zone)} | ocupados {occupied_count}/{len([slot for slot in slot_specs if slot['zone_id'] == zone['id']])}",
+                (zone["x1"], max(zone["y1"] - 8, 24)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (96, 165, 250),
+                2,
+            )
+            zone_polygon = np.array([(point["x"], point["y"]) for point in zone.get("points", [])], dtype=np.int32)
+            if len(zone_polygon) >= 3:
+                cv2.polylines(frame, [zone_polygon], True, (96, 165, 250), 2)
+
+        if best_frame is None or occupied_count > best_occupied:
+            best_occupied = occupied_count
+            best_frame = frame.copy()
+
+        if frame_count % preview_interval == 0:
+            progress = int((frame_count / max(total_frames, 1)) * 100)
+            preview_frame = frame
+            if frame_width > preview_max_width:
+                preview_scale = preview_max_width / frame_width
+                preview_frame = cv2.resize(frame, (preview_max_width, int(frame_height * preview_scale)), interpolation=cv2.INTER_AREA)
+            elapsed = max(time.perf_counter() - processing_started_at, 0.001)
+            analysis_fps = frame_count / elapsed
+            cv2.imwrite(str(preview_path), preview_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 72])
+            update_analysis(
+                analysis.pk,
+                progress=min(progress, 99),
+                processed_frames=frame_count,
+                confirmed_people=len(slot_sessions) + sum(1 for state in slot_state.values() if state["occupied"]),
+                status_message=f"Frame {frame_count:,} de {total_frames:,} | {analysis_fps:.1f} fps | slots ocupados {occupied_count}/{len(slot_specs)}",
+            )
+
+    cap.release()
+    final_time = frame_count / fps if fps else 0
+    for state in slot_state.values():
+        if state["occupied"] and state["current_session"] is not None:
+            session = state["current_session"]
+            session["departure_seconds"] = final_time
+            session["departure_frame"] = frame_count
+            session["duration_seconds"] = max(0, final_time - session["arrival_seconds"])
+            session["departed"] = False
+            slot_sessions.append(session)
+
+    if best_frame is None:
+        fail_analysis(analysis.pk, "No se pudo generar un frame representativo del estacionamiento.")
+        return
+
+    update_analysis(analysis.pk, progress=99, status_message="Generando heatmap y reportes de estacionamiento")
+    final_image = vision_utils.generate_final_heatmap(best_frame, heatmap, zones, {zone["id"]: peak_occupied_slots for zone in zones})
+    cv2.imwrite(str(output_dir / heatmap_output_file), final_image)
+    save_zone_report(output_dir, zones, {zone["id"]: peak_occupied_slots for zone in zones})
+    export_parking_analytics(
+        output_dir=output_dir,
+        fps=fps,
+        total_frames=frame_count,
+        frame_width=frame_width,
+        frame_height=frame_height,
+        zones=zones,
+        slots=slot_specs,
+        slot_sessions=slot_sessions,
+        time_bins=time_bins,
+        peak_occupied_slots=peak_occupied_slots,
+        unique_vehicles=len(slot_sessions),
+    )
+    build_results_database(output_dir, analysis.pk, video_path, zones)
+    update_analysis(
+        analysis.pk,
+        status=AnalysisRun.Status.COMPLETED,
+        progress=100,
+        processed_frames=frame_count,
+        confirmed_people=len(slot_sessions),
+        status_message="Analisis de estacionamiento completado",
+        finished_at=timezone.now(),
+    )
+
+
 def run_analysis_job(analysis_id):
     analysis = AnalysisRun.objects.get(pk=analysis_id)
     analysis.mark_running()
@@ -678,6 +1175,9 @@ def run_analysis_job(analysis_id):
     normalize_zone_geometry = vision_utils.normalize_zone_geometry
 
     try:
+        if analysis.is_parking:
+            return run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np)
+
         video_path = str(Path(analysis.video.path))
         zones = [
             normalize_zone_geometry(zone.copy(), analysis.frame_width, analysis.frame_height)

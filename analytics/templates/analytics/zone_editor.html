@@ -9,6 +9,7 @@
     <div class="analysis-page-heading">
       <h1 class="analysis-title">{{ analysis.display_name }}</h1>
       <div class="analysis-context">
+        <span class="type-pill">{{ analysis.domain_label }}</span>
         <span class="type-pill">{{ analysis.mall_label|default:"Sin establecimiento" }}</span>
         <span class="type-pill">{{ analysis.category_label|default:"General" }}</span>
         <span class="type-pill">{{ analysis.area_label|default:"Sin sector" }}</span>
@@ -22,13 +23,13 @@
 </header>
 
 <section class="workflow">
-  <a href="{% url 'analysis_list' %}">Video</a>
-  <span class="active">Zonas</span>
-  <a href="{% url 'analysis_status' analysis.pk %}">Analisis</a>
+  <a class="workflow-step is-complete" href="{% url 'analysis_list' %}"><span>Video</span></a>
+  <span class="workflow-step is-active"><span>Zonas</span></span>
+  <a class="workflow-step" href="{% url 'analysis_status' analysis.pk %}"><span>Analisis</span></a>
   {% if analysis.status == "completed" %}
-    <a href="{% url 'analysis_results' analysis.pk %}">Ver resultado</a>
+    <a class="workflow-step" href="{% url 'analysis_results' analysis.pk %}"><span>Ver resultado</span></a>
   {% else %}
-    <span class="disabled">Ver resultado</span>
+    <span class="workflow-step is-disabled"><span>Ver resultado</span></span>
   {% endif %}
 </section>
 
@@ -89,6 +90,7 @@
   const initialZones = {{ zones_json|safe }};
   const frameWidth = {{ analysis.frame_width }};
   const frameHeight = {{ analysis.frame_height }};
+  const initialZoneType = "{{ initial_zone_type }}";
 </script>
 <script src="/static/analytics/zone-editor.js?v={% now 'U' %}"></script>
 {% endblock %}

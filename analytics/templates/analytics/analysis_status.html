@@ -9,6 +9,7 @@
     <div class="analysis-page-heading">
       <h1 class="analysis-title">{{ analysis.display_name }}</h1>
       <div class="analysis-context">
+        <span class="type-pill">{{ analysis.domain_label }}</span>
         <span class="type-pill">{{ analysis.mall_label|default:"Sin establecimiento" }}</span>
         <span class="type-pill">{{ analysis.category_label|default:"General" }}</span>
         <span class="type-pill">{{ analysis.area_label|default:"Sin sector" }}</span>
@@ -27,13 +28,13 @@
 </header>
 
 <section class="workflow">
-  <a href="{% url 'analysis_list' %}">Video</a>
-  <a href="{% url 'zone_editor' analysis.pk %}">Zonas</a>
-  <span class="active">Analisis</span>
+  <a class="workflow-step is-complete" href="{% url 'analysis_list' %}"><span>Video</span></a>
+  <a class="workflow-step is-complete" href="{% url 'zone_editor' analysis.pk %}"><span>Zonas</span></a>
+  <span class="workflow-step is-active"><span>Analisis</span></span>
   {% if analysis.status == "completed" %}
-    <a href="{% url 'analysis_results' analysis.pk %}">Ver resultado</a>
+    <a class="workflow-step" href="{% url 'analysis_results' analysis.pk %}"><span>Ver resultado</span></a>
   {% else %}
-    <span class="disabled">Ver resultado</span>
+    <span class="workflow-step is-disabled"><span>Ver resultado</span></span>
   {% endif %}
 </section>
 
@@ -46,7 +47,7 @@
     <div class="run-metrics">
       <span><b id="framesDone">{{ analysis.processed_frames }}</b> frames</span>
       <span><b id="videoTimer">00:00:00 / 00:00:00</b> video</span>
-      <span><b id="peopleDone">{{ analysis.confirmed_people }}</b> personas</span>
+      <span><b id="peopleDone">{{ analysis.confirmed_people }}</b> {{ analysis.entity_label_plural }}</span>
       <span><b>{{ analysis.zones|length }}</b> zonas</span>
     </div>
     <div id="errorBox" class="form-error {% if not analysis.error_message %}hidden{% endif %}">{{ analysis.error_message }}</div>
@@ -77,7 +78,7 @@
       <img id="previewFrame" alt="Frame analizado" class="hidden">
       <div id="previewEmpty" class="empty-state">
         <i data-lucide="scan-line"></i>
-        <span>Esperando frames</span>
+      <span>Esperando frames</span>
       </div>
     </div>
   </article>
@@ -96,6 +97,7 @@
     failed: "Fallido",
     canceled: "Cancelado"
   };
+  const entityPlural = "{{ analysis.entity_label_plural }}";
 
   async function refreshProgress() {
     const response = await fetch(progressUrl);

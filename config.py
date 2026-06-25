@@ -5,6 +5,7 @@
 video_path = "video.mp4"
 
 model_name = "yolo11n.pt"
+parking_model_name = "yolo11n.pt"
 tracker_type = "bytetrack.yaml"
 
 confidence = 0.25
@@ -63,5 +64,10 @@ ZONE_STYLES = {
         "label": "ZONA",
         "bgr": (255, 255, 0),
         "hex": "#00D1FF"
+    },
+    "estacionamiento": {
+        "label": "ESTACIONAMIENTO",
+        "bgr": (255, 120, 0),
+        "hex": "#60A5FA"
     }
 }

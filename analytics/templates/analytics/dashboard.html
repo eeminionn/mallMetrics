@@ -129,7 +129,7 @@
       <nav class="analysis-tabs" aria-label="Acciones del analisis">
         <a class="analysis-tab" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
         <a class="analysis-tab" href="{% url 'download_analysis_report' analysis.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
-        <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
+        <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="table-2"></i><span>Reportes</span></a>
       </nav>
       <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
     </div>
@@ -179,11 +179,6 @@
       <strong>{{ operational_insights.quiet_time.label }}</strong>
       <small>{{ operational_insights.quiet_time.value }} eventos</small>
     </article>
-    <article class="insight-card">
-      <span>Rango estimado</span>
-      <strong>{{ operational_insights.start_clock }} - {{ operational_insights.end_clock }}</strong>
-      <small>{{ operational_insights.duration }} de video · {{ operational_insights.clock_source }}</small>
-    </article>
   </section>
 
   <section class="analysis-grid">
@@ -203,7 +198,7 @@
     <article class="panel heatmap-panel">
       <div class="panel-title">
         <h2>Mapa de calor</h2>
-        <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
+        <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="table-2"></i><span>Reportes</span></a>
       </div>
       {% if has_heatmap %}
         <img class="heatmap" src="{{ heatmap_url }}" alt="Mapa de calor generado">
@@ -293,6 +288,10 @@
     return Array.isArray(rows) && rows.length > 0;
   }
 
+  function shortTimeLabel(label) {
+    return String(label || "").split(" - ").map((part) => part.split(":").slice(0, 2).join(":")).join(" - ");
+  }
+
   if (hasRows(chartData.ranking)) {
     new Chart(document.getElementById("rankingChart"), {
       type: "bar",
@@ -320,6 +319,7 @@
 
   if (window.Plotly && chartData.trafficSurface && hasRows(chartData.trafficSurface.z)) {
     const surface = chartData.trafficSurface;
+    const surfaceTimes = surface.times.map(shortTimeLabel);
     Plotly.newPlot("zone3dChart", [{
       type: "surface",
       x: surface.times.map((_, index) => index),
@@ -333,11 +333,12 @@
     }], {
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
-      margin: { l: 0, r: 0, b: 0, t: 0 },
+      margin: { l: 12, r: 18, b: 12, t: 8 },
       scene: {
-        xaxis: { title: "Horario", color: "#A8B6D6", gridcolor: "#1e3a5f", tickmode: "array", tickvals: surface.times.map((_, index) => index), ticktext: surface.times },
-        yaxis: { title: "Zona", color: "#A8B6D6", gridcolor: "#1e3a5f", tickmode: "array", tickvals: surface.zones.map((_, index) => index), ticktext: surface.zones },
-        zaxis: { title: "Eventos", color: "#A8B6D6", gridcolor: "#1e3a5f" },
+        xaxis: { title: { text: "Hora", standoff: 22 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 }, tickmode: "array", tickvals: surface.times.map((_, index) => index), ticktext: surfaceTimes },
+        yaxis: { title: { text: "Zona", standoff: 26 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 }, tickmode: "array", tickvals: surface.zones.map((_, index) => index), ticktext: surface.zones },
+        zaxis: { title: { text: "Eventos", standoff: 18 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 } },
+        aspectratio: { x: 1.45, y: 1, z: 0.72 },
         camera: { eye: { x: 1.65, y: 1.35, z: 1.05 } }
       },
       font: { color: "#f8fbff", family: "Inter, sans-serif" }

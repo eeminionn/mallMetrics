@@ -135,16 +135,6 @@ def analysis_clock_label(analysis, seconds):
     return (start + timedelta(seconds=safe_float(seconds))).strftime("%H:%M:%S")
 
 
-def analysis_clock_source(analysis):
-    if not analysis:
-        return "tiempo del video"
-    if analysis.started_at:
-        return "hora base: inicio del analisis"
-    if analysis.created_at:
-        return "hora base: carga del video"
-    return "tiempo del video"
-
-
 def prepare_video_metadata(analysis):
     try:
         import cv2
@@ -389,7 +379,6 @@ def operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event
     max_people = max(series, key=lambda row: row["visible"], default=None)
     peak_time = max(series, key=lambda row: row["events"] or row["entries"] or row["visible"], default=None)
     quiet_time = min(series, key=lambda row: row["events"] or row["entries"] or row["visible"], default=None)
-    duration_seconds = safe_float(analysis.total_frames) / safe_float(analysis.fps or 30)
     busiest_zone = ranking[0] if ranking else {
         "label": surface["peak"]["zone"],
         "value": surface["peak"]["value"],
@@ -408,10 +397,6 @@ def operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event
             "label": quiet_time["clock"] if quiet_time else surface["quiet"]["time"],
             "value": (quiet_time["events"] or quiet_time["entries"] or quiet_time["visible"]) if quiet_time else surface["quiet"]["value"],
         },
-        "duration": format_hms(duration_seconds),
-        "start_clock": analysis_clock_label(analysis, 0),
-        "end_clock": analysis_clock_label(analysis, duration_seconds),
-        "clock_source": analysis_clock_source(analysis),
     }
 
 

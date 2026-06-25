@@ -158,6 +158,34 @@
     </article>
   </section>
 
+  <section class="insight-grid">
+    <article class="insight-card">
+      <span>Zona mas transitada</span>
+      <strong>{{ operational_insights.busiest_zone.label }}</strong>
+      <small>{{ operational_insights.busiest_zone.value }} eventos</small>
+    </article>
+    <article class="insight-card">
+      <span>Maximo de personas</span>
+      <strong>{{ operational_insights.max_people.value }}</strong>
+      <small>{{ operational_insights.max_people.label }}</small>
+    </article>
+    <article class="insight-card">
+      <span>Horario peak</span>
+      <strong>{{ operational_insights.peak_time.label }}</strong>
+      <small>{{ operational_insights.peak_time.value }} eventos</small>
+    </article>
+    <article class="insight-card">
+      <span>Horario minimo</span>
+      <strong>{{ operational_insights.quiet_time.label }}</strong>
+      <small>{{ operational_insights.quiet_time.value }} eventos</small>
+    </article>
+    <article class="insight-card">
+      <span>Rango estimado</span>
+      <strong>{{ operational_insights.start_clock }} - {{ operational_insights.end_clock }}</strong>
+      <small>{{ operational_insights.duration }} de video · {{ operational_insights.clock_source }}</small>
+    </article>
+  </section>
+
   <section class="analysis-grid">
     <article class="panel result-video-panel">
       <div class="panel-title">
@@ -199,8 +227,8 @@
 
     <article class="panel zone-3d-panel">
       <div class="panel-title">
-        <h2>Mapa 3D de zonas</h2>
-        <span>Interactivo</span>
+        <h2>Actividad 3D por horario</h2>
+        <span>Zona x hora x eventos</span>
       </div>
       <div id="zone3dChart" class="plotly-panel"></div>
     </article>
@@ -280,7 +308,7 @@
     new Chart(document.getElementById("timeChart"), {
       type: "line",
       data: {
-        labels: chartData.time.map(row => row.label),
+        labels: chartData.time.map(row => row.clock || row.label),
         datasets: [
           { label: "Personas", data: chartData.time.map(row => row.visible), borderColor: "#2563eb", backgroundColor: "rgba(37,99,235,.14)", tension: .28, fill: true },
           { label: "Eventos", data: chartData.time.map(row => row.events), borderColor: "#D6FF72", tension: .28 }
@@ -290,35 +318,33 @@
     });
   }
 
-  if (window.Plotly && hasRows(chartData.spatialZones)) {
+  if (window.Plotly && chartData.trafficSurface && hasRows(chartData.trafficSurface.z)) {
+    const surface = chartData.trafficSurface;
     Plotly.newPlot("zone3dChart", [{
-      type: "scatter3d",
-      mode: "markers+text",
-      x: chartData.spatialZones.map(row => row.x),
-      y: chartData.spatialZones.map(row => row.y),
-      z: chartData.spatialZones.map(row => row.entries || row.unique || 0),
-      text: chartData.spatialZones.map(row => row.label),
-      textposition: "top center",
-      marker: {
-        size: chartData.spatialZones.map(row => Math.max(7, Math.min(26, Math.sqrt(row.area || 1) / 12))),
-        color: chartData.spatialZones.map(row => row.entries || row.unique || 0),
-        colorscale: [[0, "#1d4ed8"], [0.5, "#38bdf8"], [1, "#d6ff72"]],
-        opacity: 0.88,
-        colorbar: { title: "Eventos" }
-      },
-      hovertemplate: "<b>%{text}</b><br>X: %{x}<br>Y: %{y}<br>Eventos: %{z}<extra></extra>"
+      type: "surface",
+      x: surface.times.map((_, index) => index),
+      y: surface.zones.map((_, index) => index),
+      z: surface.z,
+      colorscale: [[0, "#07111f"], [0.4, "#2563eb"], [0.75, "#38bdf8"], [1, "#d6ff72"]],
+      contours: { z: { show: true, usecolormap: true, highlightcolor: "#ffffff", project: { z: true } } },
+      colorbar: { title: "Eventos" },
+      hovertemplate: "Horario: %{customdata[0]}<br>Zona: %{customdata[1]}<br>Eventos: %{z}<extra></extra>",
+      customdata: surface.z.map((row, zoneIndex) => row.map((_, timeIndex) => [surface.times[timeIndex], surface.zones[zoneIndex]]))
     }], {
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
       margin: { l: 0, r: 0, b: 0, t: 0 },
       scene: {
-        xaxis: { title: "X frame", color: "#A8B6D6", gridcolor: "#1e3a5f" },
-        yaxis: { title: "Y frame", color: "#A8B6D6", gridcolor: "#1e3a5f" },
-        zaxis: { title: "Actividad", color: "#A8B6D6", gridcolor: "#1e3a5f" },
-        camera: { eye: { x: 1.55, y: 1.45, z: 1.15 } }
+        xaxis: { title: "Horario", color: "#A8B6D6", gridcolor: "#1e3a5f", tickmode: "array", tickvals: surface.times.map((_, index) => index), ticktext: surface.times },
+        yaxis: { title: "Zona", color: "#A8B6D6", gridcolor: "#1e3a5f", tickmode: "array", tickvals: surface.zones.map((_, index) => index), ticktext: surface.zones },
+        zaxis: { title: "Eventos", color: "#A8B6D6", gridcolor: "#1e3a5f" },
+        camera: { eye: { x: 1.65, y: 1.35, z: 1.05 } }
       },
       font: { color: "#f8fbff", family: "Inter, sans-serif" }
     }, { responsive: true, displaylogo: false });
+  } else {
+    document.getElementById("zone3dChart").innerHTML = '<div class="empty-state"><i data-lucide="chart-no-axes-combined"></i><span>Sin suficientes datos temporales por zona</span></div>';
+    if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
   }
 
   if (hasRows(chartData.stairs)) {

@@ -358,6 +358,26 @@
       max-height: 620px;
     }
 
+    .insight-grid {
+      @apply mb-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-5;
+    }
+
+    .insight-card {
+      @apply rounded-lg border border-line bg-[#08111f] p-4;
+    }
+
+    .insight-card span {
+      @apply block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted;
+    }
+
+    .insight-card strong {
+      @apply mt-2 block text-lg leading-tight text-copy;
+    }
+
+    .insight-card small {
+      @apply mt-2 block text-xs leading-5 text-muted;
+    }
+
     .data-panel {
       @apply mt-4;
     }
@@ -592,8 +612,15 @@
     }
 
     .result-video-panel,
+    .heatmap-panel,
     .zone-3d-panel {
-      @apply min-h-[420px];
+      @apply min-h-[520px];
+    }
+
+    .result-video-panel,
+    .heatmap-panel {
+      @apply grid;
+      grid-template-rows: auto minmax(0, 1fr);
     }
 
     .preview-shell {
@@ -607,12 +634,18 @@
 
     .analysis-video-player {
       @apply h-full w-full rounded-lg border border-line bg-black object-contain;
-      min-height: 320px;
-      max-height: 460px;
+      min-height: 420px;
+      max-height: none;
     }
 
     .plotly-panel {
-      @apply min-h-[360px] overflow-hidden rounded-lg border border-line bg-[#030712];
+      @apply min-h-[460px] overflow-hidden rounded-lg border border-line bg-[#030712];
+    }
+
+    .heatmap-panel .heatmap {
+      @apply h-full;
+      min-height: 420px;
+      max-height: none;
     }
 
     .preview-shell .empty-state {
@@ -1083,7 +1116,7 @@
     }
 
     .analysis-grid {
-      grid-template-columns: minmax(0, 1.45fr) minmax(22rem, 0.95fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .form-layout {

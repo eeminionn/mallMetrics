@@ -3,10 +3,12 @@ import io
 import json
 import re
 import zipfile
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.utils import timezone
 
 from .models import AnalysisRun, Mall
 
@@ -109,6 +111,38 @@ def format_number(value):
     if number.is_integer():
         return str(int(number))
     return f"{number:.1f}"
+
+
+def format_hms(seconds):
+    seconds = max(0, int(safe_float(seconds)))
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    remaining = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{remaining:02d}"
+
+
+def analysis_base_time(analysis):
+    if not analysis:
+        return None
+    return analysis.started_at or analysis.created_at
+
+
+def analysis_clock_label(analysis, seconds):
+    base_time = analysis_base_time(analysis)
+    if not base_time:
+        return format_hms(seconds)
+    start = timezone.localtime(base_time)
+    return (start + timedelta(seconds=safe_float(seconds))).strftime("%H:%M:%S")
+
+
+def analysis_clock_source(analysis):
+    if not analysis:
+        return "tiempo del video"
+    if analysis.started_at:
+        return "hora base: inicio del analisis"
+    if analysis.created_at:
+        return "hora base: carga del video"
+    return "tiempo del video"
 
 
 def prepare_video_metadata(analysis):
@@ -242,17 +276,143 @@ def spatial_zone_rows(zone_rows, zone_metric_rows):
     return rows
 
 
-def time_series_rows(time_rows):
+def time_series_rows(time_rows, analysis=None):
     rows = []
-    for row in time_rows:
+    for index, row in enumerate(time_rows):
+        start_seconds = safe_float(row.get("start_time_seconds", index * 30))
+        end_seconds = safe_float(row.get("end_time_seconds", start_seconds + 30))
         rows.append({
             "label": row.get("time_label") or row.get("interval") or row.get("time_bin") or "",
+            "clock": f"{analysis_clock_label(analysis, start_seconds)} - {analysis_clock_label(analysis, end_seconds)}",
+            "start": start_seconds,
+            "end": end_seconds,
             "visible": safe_int(row.get("visible_people_max", row.get("people_count", 0))),
+            "visible_avg": safe_float(row.get("visible_people_avg")),
             "events": safe_int(row.get("total_events")),
-            "entries": safe_int(row.get("store_entries")),
+            "entries": safe_int(row.get("zone_entries", row.get("store_entries", 0))),
             "exits": safe_int(row.get("store_exits")),
+            "unique": safe_int(row.get("unique_people_count")),
         })
     return rows
+
+
+def event_time_seconds(row):
+    timestamp = row.get("timestamp")
+    if timestamp is not None:
+        text = str(timestamp).strip()
+        if ":" in text:
+            parts = [safe_float(part) for part in text.split(":")]
+            if len(parts) == 3:
+                return parts[0] * 3600 + parts[1] * 60 + parts[2]
+            if len(parts) == 2:
+                return parts[0] * 60 + parts[1]
+        return safe_float(text)
+    frame_index = safe_float(row.get("frame_index"))
+    return frame_index
+
+
+def traffic_surface_payload(analysis, zone_rows, zone_metric_rows, time_rows, event_rows):
+    series = time_series_rows(time_rows, analysis)
+    if not series:
+        duration = safe_float(analysis.total_frames) / safe_float(analysis.fps or 30)
+        series = [{
+            "label": "00:00 - fin",
+            "clock": f"{analysis_clock_label(analysis, 0)} - {analysis_clock_label(analysis, duration)}",
+            "start": 0,
+            "end": max(duration, 30),
+            "visible": 0,
+            "events": 0,
+            "entries": 0,
+            "exits": 0,
+            "unique": 0,
+        }]
+
+    zone_labels = []
+    for index, row in enumerate(zone_rows or zone_metric_rows):
+        label = row.get("zone_name") or row.get("name") or row.get("zone_id") or f"Zona {index + 1}"
+        if label not in zone_labels:
+            zone_labels.append(label)
+    if not zone_labels:
+        zone_labels = ["Actividad general"]
+
+    matrix = [[0 for _ in series] for _ in zone_labels]
+    zone_index = {label: index for index, label in enumerate(zone_labels)}
+
+    for row in event_rows:
+        label = row.get("zone_name") or row.get("zone_id") or "Actividad general"
+        if label not in zone_index:
+            continue
+        seconds = event_time_seconds(row)
+        bucket_index = len(series) - 1
+        for index, bucket in enumerate(series):
+            if bucket["start"] <= seconds < bucket["end"]:
+                bucket_index = index
+                break
+        matrix[zone_index[label]][bucket_index] += 1
+
+    if not any(any(value for value in row) for row in matrix):
+        metrics_by_label = {}
+        for row in zone_metric_rows or zone_rows:
+            label = row.get("zone_name") or row.get("name") or row.get("zone_id") or "Actividad general"
+            metrics_by_label[label] = safe_int(row.get("entry_count")) or safe_int(row.get("unique_people_count"))
+        for label, value in metrics_by_label.items():
+            if label in zone_index:
+                matrix[zone_index[label]][0] = value
+
+    peak = {"zone": "-", "time": "-", "value": 0}
+    quiet = {"zone": "-", "time": "-", "value": 0}
+    flat_values = []
+    for zone_idx, zone in enumerate(zone_labels):
+        for time_idx, bucket in enumerate(series):
+            value = matrix[zone_idx][time_idx]
+            flat_values.append((value, zone, bucket["clock"]))
+            if value > peak["value"]:
+                peak = {"zone": zone, "time": bucket["clock"], "value": value}
+    positive_values = [item for item in flat_values if item[0] > 0]
+    if positive_values:
+        value, zone, label = min(positive_values, key=lambda item: item[0])
+        quiet = {"zone": zone, "time": label, "value": value}
+
+    return {
+        "times": [row["clock"] for row in series],
+        "zones": zone_labels,
+        "z": matrix,
+        "peak": peak,
+        "quiet": quiet,
+    }
+
+
+def operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event_rows):
+    ranking = ranking_rows([], zone_metric_rows, zone_rows)
+    series = time_series_rows(time_rows, analysis)
+    surface = traffic_surface_payload(analysis, zone_rows, zone_metric_rows, time_rows, event_rows)
+    max_people = max(series, key=lambda row: row["visible"], default=None)
+    peak_time = max(series, key=lambda row: row["events"] or row["entries"] or row["visible"], default=None)
+    quiet_time = min(series, key=lambda row: row["events"] or row["entries"] or row["visible"], default=None)
+    duration_seconds = safe_float(analysis.total_frames) / safe_float(analysis.fps or 30)
+    busiest_zone = ranking[0] if ranking else {
+        "label": surface["peak"]["zone"],
+        "value": surface["peak"]["value"],
+    }
+    return {
+        "busiest_zone": busiest_zone,
+        "max_people": {
+            "label": max_people["clock"] if max_people else "-",
+            "value": max_people["visible"] if max_people else 0,
+        },
+        "peak_time": {
+            "label": peak_time["clock"] if peak_time else surface["peak"]["time"],
+            "value": (peak_time["events"] or peak_time["entries"] or peak_time["visible"]) if peak_time else surface["peak"]["value"],
+        },
+        "quiet_time": {
+            "label": quiet_time["clock"] if quiet_time else surface["quiet"]["time"],
+            "value": (quiet_time["events"] or quiet_time["entries"] or quiet_time["visible"]) if quiet_time else surface["quiet"]["value"],
+        },
+        "duration": format_hms(duration_seconds),
+        "start_clock": analysis_clock_label(analysis, 0),
+        "end_clock": analysis_clock_label(analysis, duration_seconds),
+        "clock_source": analysis_clock_source(analysis),
+    }
 
 
 def stair_rows_for_chart(stair_rows):
@@ -447,9 +607,11 @@ def dashboard_context(analysis=None):
         "ranking": ranking_rows(store_rows, zone_metric_rows, zone_rows),
         "zoneActivity": zone_activity_rows(store_rows, zone_metric_rows, zone_rows),
         "spatialZones": spatial_zone_rows(zone_rows, zone_metric_rows),
-        "time": time_series_rows(time_rows),
+        "time": time_series_rows(time_rows, analysis),
+        "trafficSurface": traffic_surface_payload(analysis, zone_rows, zone_metric_rows, time_rows, event_rows),
         "stairs": stair_rows_for_chart(stair_rows),
     }
+    insights = operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event_rows)
 
     return {
         "dashboard_mode": "analysis",
@@ -461,6 +623,7 @@ def dashboard_context(analysis=None):
         "spatial_zone_rows": chart_payload["spatialZones"],
         "time_chart_rows": chart_payload["time"],
         "stair_chart_rows": chart_payload["stairs"],
+        "operational_insights": insights,
         "zone_rows": zone_metric_rows or zone_rows,
         "store_rows": store_rows,
         "time_rows": time_rows,

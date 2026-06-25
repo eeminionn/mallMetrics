@@ -68,9 +68,8 @@
 
 <div id="boardCsrfTokenHolder" class="hidden">{% csrf_token %}</div>
 
-<div class="mall-board-scroll-hint">
-  <span><i data-lucide="move-horizontal"></i><strong>Desplaza</strong> para ver mas establecimientos</span>
-  <div class="mall-board-scroll-track"><span></span></div>
+<div id="mallBoardScrollHint" class="mall-board-scroll-hint" data-scrollable="false" aria-hidden="true">
+  <div class="mall-board-scroll-track"><span id="mallBoardScrollThumb"></span></div>
 </div>
 
 <section class="mall-board">
@@ -191,7 +190,26 @@
 <script>
   (() => {
     const token = document.querySelector("#boardCsrfTokenHolder input[name='csrfmiddlewaretoken']").value;
+    const board = document.querySelector(".mall-board");
+    const scrollHint = document.getElementById("mallBoardScrollHint");
+    const scrollThumb = document.getElementById("mallBoardScrollThumb");
     let draggingCard = null;
+
+    function updateScrollHint() {
+      if (!board || !scrollHint || !scrollThumb) return;
+      const scrollable = board.scrollWidth > board.clientWidth + 2;
+      scrollHint.dataset.scrollable = scrollable ? "true" : "false";
+      if (!scrollable) return;
+
+      const track = scrollThumb.parentElement;
+      const visibleRatio = board.clientWidth / board.scrollWidth;
+      const thumbWidth = Math.max(72, Math.round(track.clientWidth * visibleRatio));
+      const maxThumbX = Math.max(0, track.clientWidth - thumbWidth);
+      const maxScroll = Math.max(1, board.scrollWidth - board.clientWidth);
+      const thumbX = Math.round((board.scrollLeft / maxScroll) * maxThumbX);
+      scrollThumb.style.width = `${thumbWidth}px`;
+      scrollThumb.style.transform = `translateX(${thumbX}px)`;
+    }
 
     async function moveStudy(card, mallId) {
       const response = await fetch(`/analyses/${card.dataset.analysisId}/move-mall/`, {
@@ -224,6 +242,7 @@
         const chip = zone.closest(".mall-column").querySelector(".status-chip");
         chip.textContent = String(cards.length);
       });
+      updateScrollHint();
     }
 
     document.querySelectorAll(".study-card").forEach(card => {
@@ -262,6 +281,10 @@
     });
 
     refreshEmptyStates();
+    updateScrollHint();
+    board?.addEventListener("scroll", updateScrollHint, { passive: true });
+    window.addEventListener("resize", updateScrollHint);
+    window.setTimeout(updateScrollHint, 250);
   })();
 </script>
 {% endblock %}

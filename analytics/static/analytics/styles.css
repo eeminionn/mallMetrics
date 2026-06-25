@@ -28,29 +28,35 @@
 
 input[type="file"]::file-selector-button {
   margin-right: 12px;
-  border: 0;
+  border: 1px solid #60a5fa;
   border-radius: 8px;
-  background: #2563eb;
-  color: #f8fbff;
+  background: transparent;
+  color: #bfdbfe;
   cursor: pointer;
   font-weight: 700;
   padding: 10px 14px;
 }
 
 input[type="file"]::file-selector-button:hover {
-  background: #60a5fa;
+  background: rgba(37, 99, 235, 0.16);
+  color: #f8fbff;
 }
 
 .confirm-modal {
   border: 0;
   background: transparent;
+  bottom: auto;
+  left: var(--confirm-left, 50%);
+  margin: 0;
   max-width: 100%;
   padding: 0;
+  position: fixed;
+  right: auto;
+  top: var(--confirm-top, 50%);
 }
 
 .confirm-modal[open] {
-  display: grid;
-  place-items: center;
+  display: block;
 }
 
 .confirm-modal::backdrop {

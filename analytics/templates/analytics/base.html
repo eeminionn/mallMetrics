@@ -138,6 +138,34 @@
       if (!dialog || typeof dialog.showModal !== "function") return;
 
       let activeForm = null;
+      let activeTrigger = null;
+
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+      const positionDialog = () => {
+        const triggerRect = activeTrigger?.getBoundingClientRect();
+        const safeGap = 12;
+        const safePad = 16;
+        const dialogWidth = Math.min(520, window.innerWidth - safePad * 2);
+        dialog.style.width = `${dialogWidth}px`;
+
+        let left = triggerRect ? triggerRect.right - dialogWidth : (window.innerWidth - dialogWidth) / 2;
+        let top = triggerRect ? triggerRect.bottom + safeGap : 80;
+        const dialogHeight = dialog.getBoundingClientRect().height || 220;
+
+        if (triggerRect && top + dialogHeight > window.innerHeight - safePad) {
+          top = triggerRect.top - dialogHeight - safeGap;
+        }
+
+        const maxLeft = Math.max(safePad, window.innerWidth - dialogWidth - safePad);
+        const maxTop = Math.max(safePad, window.innerHeight - dialogHeight - safePad);
+        left = clamp(left, safePad, maxLeft);
+        top = clamp(top, safePad, maxTop);
+        dialog.style.left = `${left}px`;
+        dialog.style.top = `${top}px`;
+        dialog.style.setProperty("--confirm-left", `${left}px`);
+        dialog.style.setProperty("--confirm-top", `${top}px`);
+      };
+
       document.querySelectorAll("form[data-confirm-message]").forEach((form) => {
         form.addEventListener("submit", (event) => {
           if (form.dataset.confirmBypass === "true") {
@@ -146,10 +174,13 @@
           }
           event.preventDefault();
           activeForm = form;
+          activeTrigger = event.submitter || form.querySelector("button[type='submit']");
           title.textContent = form.dataset.confirmTitle || "Confirmar accion";
           description.textContent = form.dataset.confirmMessage || "Esta accion no se puede deshacer.";
           actionButton.textContent = form.dataset.confirmLabel || "Confirmar";
+          positionDialog();
           dialog.showModal();
+          requestAnimationFrame(positionDialog);
         });
       });
 
@@ -159,6 +190,16 @@
           activeForm.submit();
         }
         activeForm = null;
+        activeTrigger = null;
+      });
+
+      dialog.addEventListener("cancel", () => {
+        activeForm = null;
+        activeTrigger = null;
+      });
+
+      window.addEventListener("resize", () => {
+        if (dialog.open) positionDialog();
       });
     })();
   </script>

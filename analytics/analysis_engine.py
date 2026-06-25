@@ -669,6 +669,33 @@ def point_inside_rect(x, y, rect):
     return rect["x1"] <= x <= rect["x2"] and rect["y1"] <= y <= rect["y2"]
 
 
+def boxes_iou(a, b):
+    ax1, ay1, ax2, ay2 = a["x1"], a["y1"], a["x2"], a["y2"]
+    bx1, by1, bx2, by2 = b["x1"], b["y1"], b["x2"], b["y2"]
+    inter_x1 = max(ax1, bx1)
+    inter_y1 = max(ay1, by1)
+    inter_x2 = min(ax2, bx2)
+    inter_y2 = min(ay2, by2)
+    inter_w = max(0.0, inter_x2 - inter_x1)
+    inter_h = max(0.0, inter_y2 - inter_y1)
+    inter = inter_w * inter_h
+    if inter <= 0:
+        return 0.0
+    area_a = max(1.0, (ax2 - ax1) * (ay2 - ay1))
+    area_b = max(1.0, (bx2 - bx1) * (by2 - by1))
+    return inter / (area_a + area_b - inter)
+
+
+def dedupe_vehicle_detections(detections):
+    ordered = sorted(detections, key=lambda item: item["conf"], reverse=True)
+    kept = []
+    for det in ordered:
+        if any(boxes_iou(det, existing) >= 0.45 for existing in kept):
+            continue
+        kept.append(det)
+    return kept
+
+
 def parking_zone_slots(zone, sample_box):
     zone_width = max(1, zone["x2"] - zone["x1"])
     zone_height = max(1, zone["y2"] - zone["y1"])
@@ -930,29 +957,57 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
-    def vehicle_detections(frame):
+    def collect_vehicle_boxes(result, offset_x=0.0, offset_y=0.0):
         detections = []
-        results = model(frame, verbose=False, conf=max(tracking_confidence, 0.20), iou=iou_value)
-        if not results:
+        if not result or result[0].boxes is None:
             return detections
-        boxes = results[0].boxes
-        if boxes is None:
-            return detections
-        for box in boxes:
+        for box in result[0].boxes:
             cls_id = int(box.cls[0].item()) if box.cls is not None else -1
             if cls_id not in vehicle_class_ids:
                 continue
             x1, y1, x2, y2 = [float(value) for value in box.xyxy[0].tolist()]
             conf_score = float(box.conf[0].item()) if box.conf is not None else 0.0
             detections.append({
-                "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+                "x1": x1 + offset_x, "y1": y1 + offset_y, "x2": x2 + offset_x, "y2": y2 + offset_y,
                 "w": max(1.0, x2 - x1), "h": max(1.0, y2 - y1),
-                "cx": (x1 + x2) / 2.0, "cy": (y1 + y2) / 2.0,
+                "cx": (x1 + x2) / 2.0 + offset_x, "cy": (y1 + y2) / 2.0 + offset_y,
                 "conf": conf_score,
             })
         return detections
 
-    initial_detections = vehicle_detections(first_frame)
+    def enhance_night_frame(frame):
+        return cv2.convertScaleAbs(frame, alpha=1.22, beta=12)
+
+    def tiled_vehicle_detections(frame, grid=2):
+        detections = []
+        fh, fw = frame.shape[:2]
+        tile_w = fw // grid
+        tile_h = fh // grid
+        overlap_x = tile_w // 6
+        overlap_y = tile_h // 6
+        for gy in range(grid):
+            for gx in range(grid):
+                x1 = max(0, gx * tile_w - overlap_x)
+                y1 = max(0, gy * tile_h - overlap_y)
+                x2 = min(fw, (gx + 1) * tile_w + overlap_x)
+                y2 = min(fh, (gy + 1) * tile_h + overlap_y)
+                tile = frame[y1:y2, x1:x2]
+                result = model(tile, verbose=False, conf=max(tracking_confidence, 0.08), iou=iou_value, imgsz=1280)
+                detections.extend(collect_vehicle_boxes(result, x1, y1))
+        return detections
+
+    def vehicle_detections(frame, detailed=False):
+        enhanced = enhance_night_frame(frame)
+        detections = collect_vehicle_boxes(
+            model(enhanced, verbose=False, conf=max(tracking_confidence, 0.08), iou=iou_value, imgsz=1920)
+        )
+        if detailed or len(detections) <= 1:
+            detections.extend(tiled_vehicle_detections(enhanced, grid=2))
+        if detailed and len(detections) <= 2:
+            detections.extend(tiled_vehicle_detections(enhanced, grid=4))
+        return dedupe_vehicle_detections(detections)
+
+    initial_detections = vehicle_detections(first_frame, detailed=True)
     slot_specs = []
     for zone in zones:
         inside = [det for det in initial_detections if vision_utils.point_inside_zone(det["cx"], det["cy"], zone)]
@@ -1022,7 +1077,8 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
         frame_count += 1
         current_time = frame_count / fps if fps else 0
         bin_row = ensure_time_bin(current_time)
-        detections = vehicle_detections(frame)
+        detailed_scan = frame_count % 12 == 0
+        detections = vehicle_detections(frame, detailed=detailed_scan)
 
         occupied_now = set()
         arrivals = 0

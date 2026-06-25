@@ -5,7 +5,7 @@
 video_path = "video.mp4"
 
 model_name = "yolo11n.pt"
-parking_model_name = "yolo11n.pt"
+parking_model_name = "yolo11x.pt"
 tracker_type = "bytetrack.yaml"
 
 confidence = 0.25

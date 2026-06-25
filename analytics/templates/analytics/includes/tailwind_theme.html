@@ -696,7 +696,7 @@
     }
 
     .zone-type-row {
-      @apply grid grid-cols-[minmax(0,1fr)_auto] gap-2;
+      @apply grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2;
     }
 
     .zone-type-creator {
@@ -714,6 +714,18 @@
 
     .zone-type-inline-input {
       @apply min-h-12 rounded-lg border border-signal bg-carbon px-3 py-2 text-sm font-semibold uppercase text-copy outline-none ring-2 ring-signal/20;
+    }
+
+    .zone-type-color-field {
+      @apply mb-3 flex items-center gap-3 rounded-lg border border-line bg-panel-2 px-3 py-2;
+    }
+
+    .zone-type-color-field span {
+      @apply text-xs font-semibold uppercase tracking-[0.14em] text-muted;
+    }
+
+    .zone-type-color-input {
+      @apply h-12 w-12 cursor-pointer rounded-lg border border-line bg-carbon p-1;
     }
 
     .zone-type {

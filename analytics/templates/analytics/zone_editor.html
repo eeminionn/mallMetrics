@@ -61,6 +61,11 @@
     <div id="zoneTypeCreator" class="zone-type-creator" hidden>
       <label for="newZoneTypeName">Nueva categoria</label>
       <input id="newZoneTypeName" type="text" placeholder="Ej: Mesa, caja, fila, acceso">
+      <label for="newZoneTypeColor">Color</label>
+      <div class="zone-type-color-field">
+        <input id="newZoneTypeColor" type="color" value="#60A5FA" aria-label="Color de la nueva zona">
+        <span id="newZoneTypeColorValue">#60A5FA</span>
+      </div>
       <div class="tool-row">
         <button class="ghost-button" type="button" id="cancelZoneType"><i data-lucide="x"></i><span>Cancelar</span></button>
         <button class="primary-button" type="button" id="saveZoneType"><i data-lucide="plus"></i><span>Crear</span></button>
@@ -85,5 +90,5 @@
   const frameWidth = {{ analysis.frame_width }};
   const frameHeight = {{ analysis.frame_height }};
 </script>
-<script src="/static/analytics/zone-editor.js"></script>
+<script src="/static/analytics/zone-editor.js?v={% now 'U' %}"></script>
 {% endblock %}

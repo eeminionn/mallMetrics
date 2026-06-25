@@ -184,6 +184,7 @@ def normalize_zones(raw_zones, frame_width, frame_height):
             "name": name,
             "type": zone_type,
             "type_label": type_label,
+            "hex": str(raw.get("hex") or ZONE_STYLES.get(zone_type, {}).get("hex") or "#60A5FA").strip(),
             "points": points,
             "x1": x1,
             "y1": y1,
@@ -362,6 +363,8 @@ def zone_editor(request, pk):
                 "label": str(zone.get("type_label") or zone_type_label(zone_type)).upper(),
                 "hex": zone.get("hex") or "#60A5FA",
             }
+        elif zone.get("hex"):
+            zone_styles[zone_type]["hex"] = zone.get("hex")
     return render(request, "analytics/zone_editor.html", {
         "analysis": analysis,
         "zone_styles": json.dumps(zone_styles),

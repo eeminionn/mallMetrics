@@ -9,6 +9,8 @@
   const addZoneType = document.getElementById("addZoneType");
   const zoneTypeCreator = document.getElementById("zoneTypeCreator");
   const newZoneTypeName = document.getElementById("newZoneTypeName");
+  const newZoneTypeColor = document.getElementById("newZoneTypeColor");
+  const newZoneTypeColorValue = document.getElementById("newZoneTypeColorValue");
   const saveZoneType = document.getElementById("saveZoneType");
   const cancelZoneType = document.getElementById("cancelZoneType");
   const undoZone = document.getElementById("undoZone");
@@ -24,6 +26,11 @@
   let labelHitAreas = [];
   let metrics = { scale: 1, offsetX: 0, offsetY: 0, displayW: 1, displayH: 1 };
   const customColors = ["#60A5FA", "#38BDF8", "#D6FF72", "#F472B6", "#FACC15", "#A78BFA", "#FB7185"];
+
+  function normalizeHexColor(value, fallback = "#60A5FA") {
+    const hex = String(value || "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toUpperCase() : fallback;
+  }
 
   function typeToken(label) {
     const normalized = String(label || "zona")
@@ -159,22 +166,38 @@
         input.addEventListener("blur", () => finish(true), { once: true });
       });
 
+      const colorInput = document.createElement("input");
+      colorInput.type = "color";
+      colorInput.className = "zone-type-color-input";
+      colorInput.value = normalizeHexColor(style.hex);
+      colorInput.setAttribute("aria-label", `Editar color de ${style.label}`);
+      colorInput.setAttribute("title", `Editar color de ${style.label}`);
+      colorInput.addEventListener("input", event => {
+        const nextHex = normalizeHexColor(event.target.value, style.hex);
+        zoneStyles[type].hex = nextHex;
+        zones = zones.map(zone => zone.type === type ? { ...zone, hex: nextHex } : zone);
+        button.style.setProperty("--zone-color", nextHex);
+        draw();
+      });
+
       row.appendChild(button);
+      row.appendChild(colorInput);
       row.appendChild(editButton);
       zoneTypes.appendChild(row);
     });
     if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
   }
 
-  function createCustomZoneType(label) {
+  function createCustomZoneType(label, hex) {
     if (!label || !label.trim()) return;
     const token = nextUniqueTypeToken(label);
     zoneStyles[token] = {
       label: label.trim().toUpperCase(),
-      hex: customColors[Object.keys(zoneStyles).length % customColors.length]
+      hex: normalizeHexColor(hex, customColors[Object.keys(zoneStyles).length % customColors.length])
     };
     currentType = token;
     buildTypeButtons();
+    draw();
   }
 
   function focusZoneTypeCreator() {
@@ -182,6 +205,11 @@
     zoneTypeCreator.hidden = false;
     zoneTypeCreator.setAttribute("data-open", "true");
     newZoneTypeName.value = "";
+    if (newZoneTypeColor) {
+      const defaultColor = customColors[Object.keys(zoneStyles).length % customColors.length] || "#60A5FA";
+      newZoneTypeColor.value = normalizeHexColor(defaultColor);
+      if (newZoneTypeColorValue) newZoneTypeColorValue.textContent = normalizeHexColor(defaultColor);
+    }
     newZoneTypeName.focus();
     newZoneTypeName.select();
     zoneTypeCreator.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -200,14 +228,14 @@
       newZoneTypeName?.focus();
       return;
     }
-    createCustomZoneType(label);
+    createCustomZoneType(label, newZoneTypeColor?.value);
     hideZoneTypeCreator();
   }
 
   function createZoneTypeFromPrompt() {
     const promptLabel = window.prompt("Nombre de la nueva zona", "");
     if (!promptLabel || !promptLabel.trim()) return;
-    createCustomZoneType(promptLabel);
+    createCustomZoneType(promptLabel, newZoneTypeColor?.value);
     hideZoneTypeCreator();
   }
 
@@ -504,6 +532,7 @@
       name: zoneName.value.trim() || defaultName(currentType),
       type: currentType,
       type_label: (zoneStyles[currentType] || zoneStyles.zona).label,
+      hex: normalizeHexColor((zoneStyles[currentType] || zoneStyles.zona).hex),
       points: rectanglePoints(a.x, a.y, b.x, b.y)
     });
     if (isValidZone(zone)) {
@@ -543,9 +572,19 @@
     if (event.key === "Enter") saveCustomZoneType();
     if (event.key === "Escape") hideZoneTypeCreator();
   });
+  newZoneTypeColor?.addEventListener("input", event => {
+    if (newZoneTypeColorValue) {
+      newZoneTypeColorValue.textContent = normalizeHexColor(event.target.value);
+    }
+  });
 
   form.addEventListener("submit", () => {
-    zones = zones.filter(isValidZone).map(updateBounds);
+    zones = zones
+      .filter(isValidZone)
+      .map(zone => updateBounds({
+        ...zone,
+        hex: normalizeHexColor((zoneStyles[zone.type] || zoneStyles.zona).hex),
+      }));
     zonesInput.value = JSON.stringify(zones);
   });
 

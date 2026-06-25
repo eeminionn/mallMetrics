@@ -992,7 +992,7 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
     def vehicle_detections(frame, detailed=False):
         enhanced = enhance_night_frame(frame)
         detections = collect_vehicle_boxes(
-            model(enhanced, verbose=False, conf=max(tracking_confidence, 0.08), iou=iou_value, imgsz=1920)
+            model(enhanced, verbose=False, conf=max(tracking_confidence, 0.08), iou=iou_value, imgsz=1280)
         )
         if detailed or len(detections) <= 1:
             detections.extend(tiled_vehicle_detections(enhanced, grid=2))
@@ -1099,7 +1099,7 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
         analyzed_frame_count += 1
         current_time = frame_count / fps if fps else 0
         bin_row = ensure_time_bin(current_time)
-        detailed_scan = analyzed_frame_count % 6 == 0
+        detailed_scan = analyzed_frame_count % 12 == 0
         detections = vehicle_detections(frame, detailed=detailed_scan)
 
         occupied_now = set()

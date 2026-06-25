@@ -5,7 +5,7 @@
 video_path = "video.mp4"
 
 model_name = "yolo11n.pt"
-parking_model_name = "yolo11n.pt"
+parking_model_name = "yolo11x.pt"
 tracker_type = "bytetrack.yaml"
 
 confidence = 0.25
@@ -26,7 +26,7 @@ database_file = "usuarios.db"
 display_every_n_frames = 2
 
 # En estacionamientos no hace falta analizar cada frame para medir ocupacion.
-parking_frame_stride = 10
+parking_frame_stride = 4
 
 
 # ============================================================

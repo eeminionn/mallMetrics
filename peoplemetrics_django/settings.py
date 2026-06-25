@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 
@@ -77,3 +78,5 @@ LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
 PEOPLEMETRICS_REPORT_DIR = BASE_DIR
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_ANALYST_MODEL = os.getenv("OPENAI_ANALYST_MODEL", "gpt-4o-mini")

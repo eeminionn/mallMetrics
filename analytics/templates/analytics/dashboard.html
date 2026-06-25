@@ -134,7 +134,7 @@
         <a class="analysis-tab" href="{% url 'download_analysis_report' analysis.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
         <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="table-2"></i><span>Reportes</span></a>
         <a class="analysis-tab" href="{% url 'download_executive_pdf' analysis.pk %}"><i data-lucide="file-text"></i><span>PDF ejecutivo</span></a>
-        <a class="analysis-tab" href="{% url 'download_executive_pptx' analysis.pk %}"><i data-lucide="presentation"></i><span>PPTX</span></a>
+        <a class="analysis-tab" href="#" data-dev-alert="Funcion en desarrollo"><i data-lucide="presentation"></i><span>PPTX</span></a>
         <a class="analysis-tab" href="{% url 'analysis_presentation' analysis.pk %}"><i data-lucide="monitor-play"></i><span>Modo presentacion</span></a>
       </nav>
       <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
@@ -202,6 +202,18 @@
           </span>
         {% endfor %}
       </div>
+      <details class="analysis-detail-toggle">
+        <summary><i data-lucide="sparkles"></i><span>Comentario de mejora</span></summary>
+        <div class="alert-item">
+          <strong>{{ ai_analyst.source|upper }}</strong>
+          <span>{{ ai_analyst.video_quality_comment }}</span>
+          <ul class="presentation-list">
+            {% for action in ai_analyst.video_improvement_actions %}
+              <li>{{ action }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </details>
     </article>
 
     <article class="enterprise-panel">
@@ -309,10 +321,11 @@
     <details class="enterprise-panel" open>
       <summary>
         <span><i data-lucide="sparkles"></i> Narrativa automatica y notas</span>
+        <small>{{ ai_analyst.status }}</small>
         <i data-lucide="chevron-down"></i>
       </summary>
       <ul class="presentation-list">
-        {% for line in narrative_summary %}
+        {% for line in ai_analyst.narrative %}
           <li>{{ line }}</li>
         {% endfor %}
       </ul>
@@ -347,7 +360,7 @@
           </table>
         </div>
         <div class="study-list">
-          {% for scenario in layout_scenarios %}
+          {% for scenario in ai_analyst.layout_recommendations %}
             <article class="mini-kpi">
               <span>{{ scenario.impact }}</span>
               <strong>{{ scenario.title }}</strong>
@@ -572,23 +585,24 @@
 
   if (window.Plotly && chartData.trafficSurface && hasRows(chartData.trafficSurface.z)) {
     const surface = chartData.trafficSurface;
-    const surfaceTimes = surface.times.map(shortTimeLabel);
+    const surfaceTimes = surface.timeShortLabels || surface.times.map(shortTimeLabel);
+    const surfaceSeconds = surface.timeSeconds || surface.times.map((_, index) => index);
     Plotly.newPlot("zone3dChart", [{
       type: "surface",
-      x: surface.times.map((_, index) => index),
+      x: surfaceSeconds,
       y: surface.zones.map((_, index) => index),
       z: surface.z,
       colorscale: [[0, "#07111f"], [0.4, "#2563eb"], [0.75, "#38bdf8"], [1, "#d6ff72"]],
       contours: { z: { show: true, usecolormap: true, highlightcolor: "#ffffff", project: { z: true } } },
       colorbar: { title: "Eventos" },
-      hovertemplate: "Horario: %{customdata[0]}<br>Zona: %{customdata[1]}<br>Eventos: %{z}<extra></extra>",
-      customdata: surface.z.map((row, zoneIndex) => row.map((_, timeIndex) => [surface.times[timeIndex], surface.zones[zoneIndex]]))
+      hovertemplate: "Horario aprox: %{customdata[0]}<br>Intervalo: %{customdata[2]}<br>Zona: %{customdata[1]}<br>Eventos: %{z}<extra></extra>",
+      customdata: surface.z.map((row, zoneIndex) => row.map((_, timeIndex) => [surfaceTimes[timeIndex], surface.zones[zoneIndex], surface.times[timeIndex]]))
     }], {
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
       margin: { l: 12, r: 18, b: 12, t: 8 },
       scene: {
-        xaxis: { title: { text: "Hora", standoff: 22 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 }, tickmode: "array", tickvals: surface.times.map((_, index) => index), ticktext: surfaceTimes },
+        xaxis: { title: { text: "Hora", standoff: 22 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 }, tickmode: "array", tickvals: surfaceSeconds, ticktext: surfaceTimes },
         yaxis: { title: { text: "Zona", standoff: 26 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 }, tickmode: "array", tickvals: surface.zones.map((_, index) => index), ticktext: surface.zones },
         zaxis: { title: { text: "Eventos", standoff: 18 }, color: "#A8B6D6", gridcolor: "#1e3a5f", tickfont: { size: 10 } },
         aspectratio: { x: 1.45, y: 1, z: 0.72 },

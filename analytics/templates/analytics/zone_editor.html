@@ -43,12 +43,21 @@
     </div>
     <div class="canvas-shell">
       <canvas id="zoneCanvas"></canvas>
-      <img id="frameImage" src="{{ analysis.first_frame.url }}" alt="Frame base" hidden>
+      {% if frame_url %}
+        <img id="frameImage" src="{{ frame_url }}" alt="Frame base" hidden>
+      {% else %}
+        <img id="frameImage" alt="Frame base" hidden>
+      {% endif %}
     </div>
   </section>
 
   <aside class="panel zone-tools">
-    <div class="panel-title"><h2>Tipo de zona</h2></div>
+    <div class="panel-title">
+      <h2>Tipo de zona</h2>
+      <button class="ghost-button icon-button" type="button" id="addZoneType" aria-label="Agregar tipo de zona" title="Agregar tipo de zona">
+        <i data-lucide="plus"></i>
+      </button>
+    </div>
     <div class="zone-type-list" id="zoneTypes"></div>
     <label for="zoneName">Nombre</label>
     <input id="zoneName" type="text" placeholder="Ej: Caja 1, fila rapida, mesa norte">

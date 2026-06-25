@@ -1,7 +1,10 @@
+import base64
 import csv
 import io
 import json
 import re
+import urllib.error
+import urllib.request
 import zipfile
 from datetime import timedelta
 from pathlib import Path
@@ -174,6 +177,21 @@ def analysis_clock_label(analysis, seconds):
     return (start + timedelta(seconds=safe_float(seconds))).strftime("%H:%M:%S")
 
 
+def compact_clock_label(analysis, seconds):
+    base_time = analysis_base_time(analysis)
+    if not base_time:
+        total_seconds = int(safe_float(seconds))
+        return f"{total_seconds // 3600:02d}:{(total_seconds % 3600) // 60:02d}"
+    start = timezone.localtime(base_time)
+    return (start + timedelta(seconds=safe_float(seconds))).strftime("%H:%M")
+
+
+def compact_clock_range(analysis, start_seconds, end_seconds):
+    start_label = compact_clock_label(analysis, start_seconds)
+    end_label = compact_clock_label(analysis, end_seconds)
+    return start_label if start_label == end_label else f"{start_label} - {end_label}"
+
+
 def prepare_video_metadata(analysis):
     try:
         import cv2
@@ -313,8 +331,10 @@ def time_series_rows(time_rows, analysis=None):
         rows.append({
             "label": row.get("time_label") or row.get("interval") or row.get("time_bin") or "",
             "clock": f"{analysis_clock_label(analysis, start_seconds)} - {analysis_clock_label(analysis, end_seconds)}",
+            "clock_short": compact_clock_range(analysis, start_seconds, end_seconds),
             "start": start_seconds,
             "end": end_seconds,
+            "mid": (start_seconds + end_seconds) / 2,
             "visible": safe_int(row.get("visible_people_max", row.get("people_count", 0))),
             "visible_avg": safe_float(row.get("visible_people_avg")),
             "events": safe_int(row.get("total_events")),
@@ -347,8 +367,10 @@ def traffic_surface_payload(analysis, zone_rows, zone_metric_rows, time_rows, ev
         series = [{
             "label": "00:00 - fin",
             "clock": f"{analysis_clock_label(analysis, 0)} - {analysis_clock_label(analysis, duration)}",
+            "clock_short": compact_clock_range(analysis, 0, duration),
             "start": 0,
             "end": max(duration, 30),
+            "mid": max(duration, 30) / 2,
             "visible": 0,
             "events": 0,
             "entries": 0,
@@ -404,6 +426,8 @@ def traffic_surface_payload(analysis, zone_rows, zone_metric_rows, time_rows, ev
 
     return {
         "times": [row["clock"] for row in series],
+        "timeShortLabels": [row["clock_short"] for row in series],
+        "timeSeconds": [row["mid"] for row in series],
         "zones": zone_labels,
         "z": matrix,
         "peak": peak,
@@ -425,17 +449,72 @@ def operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event
     return {
         "busiest_zone": busiest_zone,
         "max_people": {
-            "label": max_people["clock"] if max_people else "-",
+            "label": max_people["clock_short"] if max_people else "-",
             "value": max_people["visible"] if max_people else 0,
         },
         "peak_time": {
-            "label": peak_time["clock"] if peak_time else surface["peak"]["time"],
+            "label": peak_time["clock_short"] if peak_time else surface["peak"]["time"],
             "value": (peak_time["events"] or peak_time["entries"] or peak_time["visible"]) if peak_time else surface["peak"]["value"],
         },
         "quiet_time": {
-            "label": quiet_time["clock"] if quiet_time else surface["quiet"]["time"],
+            "label": quiet_time["clock_short"] if quiet_time else surface["quiet"]["time"],
             "value": (quiet_time["events"] or quiet_time["entries"] or quiet_time["visible"]) if quiet_time else surface["quiet"]["value"],
         },
+    }
+
+
+def first_frame_visual_metrics(analysis):
+    frame_path = Path(analysis.first_frame.path) if getattr(analysis, "first_frame", None) else None
+    if not frame_path or not frame_path.exists():
+        return {
+            "available": False,
+            "brightness": 0,
+            "contrast": 0,
+            "sharpness": 0,
+            "comment": "No hay frame base disponible para revisar brillo, contraste y nitidez.",
+        }
+
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        return {
+            "available": False,
+            "brightness": 0,
+            "contrast": 0,
+            "sharpness": 0,
+            "comment": "Falta OpenCV para calcular calidad visual del frame.",
+        }
+
+    frame = cv2.imread(str(frame_path))
+    if frame is None:
+        return {
+            "available": False,
+            "brightness": 0,
+            "contrast": 0,
+            "sharpness": 0,
+            "comment": "No se pudo leer el frame base para evaluar calidad visual.",
+        }
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    brightness = float(np.mean(gray))
+    contrast = float(np.std(gray))
+    sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    comments = []
+    if brightness < 65:
+        comments.append("la imagen se ve oscura")
+    elif brightness > 190:
+        comments.append("la imagen esta sobreexpuesta")
+    if contrast < 32:
+        comments.append("hay bajo contraste entre personas y fondo")
+    if sharpness < 95:
+        comments.append("la nitidez parece baja o hay movimiento/camara blanda")
+    return {
+        "available": True,
+        "brightness": round(brightness, 1),
+        "contrast": round(contrast, 1),
+        "sharpness": round(sharpness, 1),
+        "comment": "; ".join(comments) if comments else "El frame base tiene condiciones visuales razonables para deteccion.",
     }
 
 
@@ -447,24 +526,25 @@ def video_quality_score(analysis):
     processed_frames = safe_int(getattr(analysis, "processed_frames", 0))
     duration = total_frames / fps if fps else 0
     zones_count = len(getattr(analysis, "zones", []) or [])
+    visual = first_frame_visual_metrics(analysis)
 
     score = 0
     checks = []
 
     resolution_ok = width >= 1280 and height >= 720
-    score += 30 if resolution_ok else 15 if width and height else 0
+    score += 20 if resolution_ok else 10 if width and height else 0
     checks.append({"label": "Resolucion", "value": f"{width}x{height}" if width and height else "Sin metadata", "ok": resolution_ok})
 
     fps_ok = fps >= 24
-    score += 25 if fps_ok else 12 if fps else 0
+    score += 15 if fps_ok else 8 if fps else 0
     checks.append({"label": "FPS", "value": format_number(fps) if fps else "-", "ok": fps_ok})
 
     duration_ok = duration >= 30
-    score += 20 if duration_ok else 10 if duration else 0
+    score += 10 if duration_ok else 5 if duration else 0
     checks.append({"label": "Duracion", "value": format_hms(duration), "ok": duration_ok})
 
     zones_ok = zones_count > 0
-    score += 15 if zones_ok else 0
+    score += 10 if zones_ok else 0
     checks.append({"label": "Zonas", "value": str(zones_count), "ok": zones_ok})
 
     coverage = processed_frames / total_frames if total_frames else 0
@@ -472,9 +552,20 @@ def video_quality_score(analysis):
     score += 10 if coverage_ok else 4 if processed_frames else 0
     checks.append({"label": "Cobertura", "value": f"{round(coverage * 100)}%" if total_frames else "-", "ok": coverage_ok})
 
+    if visual["available"]:
+        brightness_ok = 65 <= visual["brightness"] <= 190
+        contrast_ok = visual["contrast"] >= 32
+        sharpness_ok = visual["sharpness"] >= 95
+        score += 15 if brightness_ok else 5
+        score += 10 if contrast_ok else 3
+        score += 10 if sharpness_ok else 3
+        checks.append({"label": "Brillo", "value": visual["brightness"], "ok": brightness_ok})
+        checks.append({"label": "Contraste", "value": visual["contrast"], "ok": contrast_ok})
+        checks.append({"label": "Nitidez", "value": visual["sharpness"], "ok": sharpness_ok})
+
     score = min(100, round(score))
     label = "Excelente" if score >= 85 else "Operativa" if score >= 70 else "Revisar" if score >= 50 else "Critica"
-    return {"score": score, "label": label, "checks": checks}
+    return {"score": score, "label": label, "checks": checks, "visual": visual}
 
 
 def friction_rows(zone_metric_rows, zone_rows):
@@ -546,6 +637,200 @@ def narrative_summary(analysis, summary, insights, alerts, comparison, video_qua
     if comparison:
         lines.append(f"Frente a {comparison['analysis'].display_name}, las entradas cambian {comparison['entries']['absolute']:+d}.")
     return lines
+
+
+def local_ai_analyst(summary, insights, alerts, layout_scenarios, video_quality):
+    return {
+        "enabled": False,
+        "source": "local",
+        "status": "Configura OPENAI_API_KEY para activar analista IA.",
+        "narrative": narrative_summary_placeholder(summary, insights, alerts, video_quality),
+        "layout_recommendations": layout_scenarios,
+        "video_quality_comment": video_quality["visual"]["comment"],
+        "video_improvement_actions": [
+            "Usa un plano fijo con buena iluminacion frontal.",
+            "Evita contraluces, reflejos fuertes y camara en movimiento.",
+            "Mantén personas completas dentro del encuadre en las zonas criticas.",
+        ],
+        "confidence": "Media",
+    }
+
+
+def narrative_summary_placeholder(summary, insights, alerts, video_quality):
+    lines = [
+        f"Se detectan {summary.get('total_people', '-')} personas validadas y {summary.get('total_zone_entries', '0')} entradas a zonas.",
+        f"El foco principal esta en {insights['busiest_zone']['label']} y el peak operativo aparece cerca de {insights['peak_time']['label']}.",
+        f"La calidad visual queda en {video_quality['score']}/100 ({video_quality['label']}): {video_quality['visual']['comment']}",
+    ]
+    if alerts:
+        lines.append(f"Prioridad sugerida: revisar {alerts[0]['title'].lower()} porque puede afectar interpretacion o operacion.")
+    return lines
+
+
+def first_frame_data_url(analysis):
+    frame_path = Path(analysis.first_frame.path) if getattr(analysis, "first_frame", None) else None
+    if not frame_path or not frame_path.exists():
+        return ""
+    try:
+        from PIL import Image
+    except ImportError:
+        return ""
+
+    try:
+        with Image.open(frame_path) as image:
+            image.thumbnail((960, 540))
+            buffer = io.BytesIO()
+            image.convert("RGB").save(buffer, format="JPEG", quality=78)
+    except Exception:
+        return ""
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/jpeg;base64,{encoded}"
+
+
+def openai_analyst_schema():
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "narrative": {"type": "array", "items": {"type": "string"}},
+            "layout_recommendations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "title": {"type": "string"},
+                        "body": {"type": "string"},
+                        "impact": {"type": "string"},
+                    },
+                    "required": ["title", "body", "impact"],
+                },
+            },
+            "video_quality_comment": {"type": "string"},
+            "video_improvement_actions": {"type": "array", "items": {"type": "string"}},
+            "confidence": {"type": "string"},
+        },
+        "required": [
+            "narrative",
+            "layout_recommendations",
+            "video_quality_comment",
+            "video_improvement_actions",
+            "confidence",
+        ],
+    }
+
+
+def extract_response_text(response_payload):
+    if response_payload.get("output_text"):
+        return response_payload["output_text"]
+    for output in response_payload.get("output", []):
+        for content in output.get("content", []):
+            if content.get("type") in {"output_text", "text"} and content.get("text"):
+                return content["text"]
+    return ""
+
+
+def request_openai_analyst(analysis, summary, insights, alerts, comparison, video_quality, layout_scenarios):
+    api_key = getattr(settings, "OPENAI_API_KEY", "")
+    if not api_key:
+        return None
+
+    payload = {
+        "analysis": {
+            "name": analysis.display_name,
+            "establishment": analysis.mall_label,
+            "category": analysis.category_label,
+            "area": analysis.area_label,
+            "status": analysis.get_status_display(),
+        },
+        "summary": summary,
+        "insights": insights,
+        "alerts": alerts,
+        "comparison": {
+            "previous_analysis": comparison["analysis"].display_name,
+            "people_delta": comparison["people"],
+            "entries_delta": comparison["entries"],
+        } if comparison else None,
+        "video_quality": video_quality,
+        "layout_scenarios": layout_scenarios,
+        "zones": analysis.zones,
+    }
+    content = [
+        {
+            "type": "input_text",
+            "text": (
+                "Actua como analista senior de datos y operaciones. Devuelve hallazgos accionables, "
+                "recomendaciones de layout y comentarios de calidad de video basados solo en esta evidencia. "
+                "Evita exagerar certeza si los datos son escasos."
+            ),
+        },
+        {"type": "input_text", "text": json.dumps(payload, ensure_ascii=False)},
+    ]
+    image_url = first_frame_data_url(analysis)
+    if image_url:
+        content.append({"type": "input_image", "image_url": image_url})
+
+    request_payload = {
+        "model": getattr(settings, "OPENAI_ANALYST_MODEL", "gpt-4o-mini"),
+        "input": [{"role": "user", "content": content}],
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "peoplemetrics_analyst",
+                "strict": True,
+                "schema": openai_analyst_schema(),
+            }
+        },
+    }
+    request = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(request_payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=24) as response:
+            body = response.read().decode("utf-8")
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError):
+        return None
+
+    try:
+        parsed = json.loads(extract_response_text(json.loads(body)))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    parsed.update({"enabled": True, "source": "openai", "status": "Analisis generado por IA"})
+    return parsed
+
+
+def ai_analyst_context(analysis, summary, insights, alerts, comparison, video_quality, layout_scenarios):
+    fallback = local_ai_analyst(summary, insights, alerts, layout_scenarios, video_quality)
+    if not getattr(settings, "OPENAI_API_KEY", ""):
+        return fallback
+
+    cache_key = "ai_analyst_v1"
+    cached = InsightNote.objects.filter(analysis=analysis, insight_key=cache_key).first()
+    if cached and cached.updated_at >= analysis.updated_at:
+        try:
+            data = json.loads(cached.body)
+            data.update({"enabled": True, "source": "openai", "status": "Analisis generado por IA"})
+            return data
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+
+    generated = request_openai_analyst(analysis, summary, insights, alerts, comparison, video_quality, layout_scenarios)
+    if not generated:
+        fallback["status"] = "IA no disponible temporalmente; mostrando analisis local."
+        return fallback
+
+    InsightNote.objects.update_or_create(
+        analysis=analysis,
+        insight_key=cache_key,
+        defaults={"body": json.dumps(generated, ensure_ascii=False)},
+    )
+    return generated
 
 
 def operational_alerts(analysis, summary, insights, chart_payload, zone_metric_rows, zone_rows, video_quality):
@@ -1049,6 +1334,7 @@ def dashboard_context(analysis=None, overview_analyses=None):
     comparison = analysis_comparison(analysis, summary, chart_payload["ranking"])
     scenarios = layout_scenario_rows(chart_payload["friction"])
     narrative = narrative_summary(analysis, summary, insights, alerts, comparison, video_quality)
+    ai_analyst = ai_analyst_context(analysis, summary, insights, alerts, comparison, video_quality, scenarios)
     insight_notes = {
         note.insight_key: note
         for note in InsightNote.objects.filter(analysis=analysis)
@@ -1072,6 +1358,7 @@ def dashboard_context(analysis=None, overview_analyses=None):
         "trajectory_clusters": chart_payload["clusters"],
         "layout_scenarios": scenarios,
         "narrative_summary": narrative,
+        "ai_analyst": ai_analyst,
         "metric_dictionary": METRIC_DICTIONARY,
         "insight_notes": insight_notes,
         "zone_versions": analysis.zone_versions.select_related("created_by")[:6],

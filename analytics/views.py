@@ -1,4 +1,5 @@
 import json
+import re
 import threading
 
 from django.contrib import messages
@@ -140,19 +141,29 @@ def zone_bounds(points):
     return min(xs), min(ys), max(xs), max(ys)
 
 
+def normalize_zone_type(raw_type):
+    zone_type = re.sub(r"[^0-9a-zA-Z_]+", "_", str(raw_type or "zona").strip().lower()).strip("_")
+    return zone_type or "zona"
+
+
+def zone_type_label(zone_type):
+    if zone_type in ZONE_STYLES:
+        return ZONE_STYLES[zone_type]["label"]
+    return zone_type.replace("_", " ").upper()
+
+
 def normalize_zones(raw_zones, frame_width, frame_height):
     zones = []
     counters = {}
     for raw in raw_zones:
-        zone_type = str(raw.get("type", "zona")).strip()
-        if zone_type not in ZONE_STYLES:
-            zone_type = "zona"
+        zone_type = normalize_zone_type(raw.get("type", "zona"))
 
         counters[zone_type] = counters.get(zone_type, 0) + 1
         zone_id = str(raw.get("id") or f"{zone_type}_{counters[zone_type]}")
+        type_label = str(raw.get("type_label") or zone_type_label(zone_type)).strip().upper()
         name = str(raw.get("name") or "").strip()
         if not name:
-            name = f"{ZONE_STYLES[zone_type]['label']} {counters[zone_type]}"
+            name = f"{type_label} {counters[zone_type]}"
 
         raw_points = raw.get("points")
         if isinstance(raw_points, list) and len(raw_points) >= 4:
@@ -170,6 +181,7 @@ def normalize_zones(raw_zones, frame_width, frame_height):
             "id": zone_id,
             "name": name,
             "type": zone_type,
+            "type_label": type_label,
             "points": points,
             "x1": x1,
             "y1": y1,
@@ -313,10 +325,18 @@ def zone_editor(request, pk):
         for key, value in ZONE_STYLES.items()
         if key in {"zona"}
     }
+    for zone in analysis.zones or []:
+        zone_type = normalize_zone_type(zone.get("type", "zona"))
+        if zone_type not in zone_styles:
+            zone_styles[zone_type] = {
+                "label": str(zone.get("type_label") or zone_type_label(zone_type)).upper(),
+                "hex": zone.get("hex") or "#60A5FA",
+            }
     return render(request, "analytics/zone_editor.html", {
         "analysis": analysis,
         "zone_styles": json.dumps(zone_styles),
         "zones_json": json.dumps(analysis.zones),
+        "frame_url": analysis.first_frame.url if analysis.first_frame else "",
     })
 
 

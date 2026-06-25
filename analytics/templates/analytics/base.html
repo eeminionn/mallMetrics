@@ -93,6 +93,10 @@
       </div>
     </form>
   </dialog>
+  <div id="appToast" class="app-toast" hidden>
+    <i data-lucide="info"></i>
+    <span id="appToastText">Funcion en desarrollo</span>
+  </div>
 
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script>
@@ -200,6 +204,30 @@
 
       window.addEventListener("resize", () => {
         if (dialog.open) positionDialog();
+      });
+    })();
+
+    (() => {
+      const toast = document.getElementById("appToast");
+      const toastText = document.getElementById("appToastText");
+      let timer = null;
+      const showToast = (message) => {
+        if (!toast || !toastText) return;
+        toastText.textContent = message;
+        toast.hidden = false;
+        toast.dataset.show = "true";
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          toast.dataset.show = "false";
+          window.setTimeout(() => { toast.hidden = true; }, 180);
+        }, 2600);
+      };
+
+      document.querySelectorAll("[data-dev-alert]").forEach((trigger) => {
+        trigger.addEventListener("click", (event) => {
+          event.preventDefault();
+          showToast(trigger.dataset.devAlert || "Funcion en desarrollo");
+        });
       });
     })();
   </script>

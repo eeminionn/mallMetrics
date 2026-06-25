@@ -6,6 +6,7 @@
   const zoneCount = document.getElementById("zoneCount");
   const zoneTypes = document.getElementById("zoneTypes");
   const zoneName = document.getElementById("zoneName");
+  const addZoneType = document.getElementById("addZoneType");
   const undoZone = document.getElementById("undoZone");
   const clearZones = document.getElementById("clearZones");
   const ctx = canvas.getContext("2d");
@@ -18,6 +19,26 @@
   let pointer = null;
   let labelHitAreas = [];
   let metrics = { scale: 1, offsetX: 0, offsetY: 0, displayW: 1, displayH: 1 };
+  const customColors = ["#60A5FA", "#38BDF8", "#D6FF72", "#F472B6", "#FACC15", "#A78BFA", "#FB7185"];
+
+  function typeToken(label) {
+    const normalized = String(label || "zona")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    return normalized || "zona";
+  }
+
+  function nextUniqueTypeToken(label) {
+    const base = typeToken(label);
+    if (!zoneStyles[base]) return base;
+    let index = 2;
+    while (zoneStyles[`${base}_${index}`]) index += 1;
+    return `${base}_${index}`;
+  }
 
   function nextZoneId(type) {
     const count = zones.filter(zone => zone.type === type).length + 1;
@@ -88,6 +109,9 @@
   function buildTypeButtons() {
     zoneTypes.innerHTML = "";
     Object.entries(zoneStyles).forEach(([type, style]) => {
+      const row = document.createElement("div");
+      row.className = "zone-type-row";
+
       const button = document.createElement("button");
       button.type = "button";
       button.className = `zone-type ${type === currentType ? "selected" : ""}`;
@@ -97,8 +121,40 @@
         currentType = type;
         buildTypeButtons();
       });
-      zoneTypes.appendChild(button);
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "ghost-button icon-button zone-type-edit";
+      editButton.setAttribute("aria-label", `Editar ${style.label}`);
+      editButton.setAttribute("title", `Editar ${style.label}`);
+      editButton.innerHTML = '<i data-lucide="pencil"></i>';
+      editButton.addEventListener("click", () => {
+        const nextLabel = window.prompt("Nombre del tipo de zona", style.label);
+        if (!nextLabel || !nextLabel.trim()) return;
+        const nextValue = nextLabel.trim().toUpperCase();
+        zoneStyles[type].label = nextLabel.trim().toUpperCase();
+        zones = zones.map(zone => zone.type === type ? { ...zone, type_label: nextValue } : zone);
+        buildTypeButtons();
+        draw();
+      });
+
+      row.appendChild(button);
+      row.appendChild(editButton);
+      zoneTypes.appendChild(row);
     });
+    if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
+  }
+
+  function addCustomZoneType() {
+    const label = window.prompt("Nombre del nuevo tipo de zona", "Nueva zona");
+    if (!label || !label.trim()) return;
+    const token = nextUniqueTypeToken(label);
+    zoneStyles[token] = {
+      label: label.trim().toUpperCase(),
+      hex: customColors[Object.keys(zoneStyles).length % customColors.length]
+    };
+    currentType = token;
+    buildTypeButtons();
   }
 
   function resizeCanvas() {
@@ -243,7 +299,7 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#05070d";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    if (image.complete) {
+    if (image.complete && image.naturalWidth) {
       ctx.drawImage(image, metrics.offsetX, metrics.offsetY, metrics.displayW, metrics.displayH);
     }
     ctx.strokeStyle = "#2563eb";
@@ -380,6 +436,7 @@
       id: nextZoneId(currentType),
       name: zoneName.value.trim() || defaultName(currentType),
       type: currentType,
+      type_label: (zoneStyles[currentType] || zoneStyles.zona).label,
       points: rectanglePoints(a.x, a.y, b.x, b.y)
     });
     if (isValidZone(zone)) {
@@ -411,6 +468,8 @@
     zones = [];
     draw();
   });
+
+  addZoneType?.addEventListener("click", addCustomZoneType);
 
   form.addEventListener("submit", () => {
     zones = zones.filter(isValidZone).map(updateBounds);

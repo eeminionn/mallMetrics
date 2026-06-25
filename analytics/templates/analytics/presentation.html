@@ -15,7 +15,10 @@
 <body data-tailwind-ready="true">
   <main class="presentation-shell">
     <header class="presentation-hero">
-      <span class="eyebrow">PIPOLMETRICS / Presentacion ejecutiva</span>
+      <div class="presentation-hero-actions">
+        <span class="eyebrow">PIPOLMETRICS / Presentacion ejecutiva</span>
+        <a class="ghost-button" href="{% url 'analysis_results' analysis.pk %}"><i data-lucide="arrow-left"></i><span>Volver</span></a>
+      </div>
       <h1>{{ analysis.display_name }}</h1>
       <p>{{ analysis.mall_label|default:"Sin establecimiento" }} · {{ analysis.category_label|default:"General" }} · {{ analysis.area_label|default:"Sin sector" }}</p>
     </header>
@@ -31,7 +34,7 @@
       <article class="panel">
         <div class="panel-title"><h2>Narrativa ejecutiva</h2></div>
         <ul class="presentation-list">
-          {% for line in narrative_summary %}<li>{{ line }}</li>{% endfor %}
+          {% for line in ai_analyst.narrative %}<li>{{ line }}</li>{% endfor %}
         </ul>
       </article>
       <article class="panel">
@@ -58,7 +61,7 @@
       <article class="panel">
         <div class="panel-title"><h2>Escenarios sugeridos</h2></div>
         <div class="study-list">
-          {% for scenario in layout_scenarios %}
+          {% for scenario in ai_analyst.layout_recommendations %}
             <article class="mini-kpi"><span>{{ scenario.impact }}</span><strong>{{ scenario.title }}</strong><small>{{ scenario.body }}</small></article>
           {% empty %}
             <div class="empty-state compact-empty"><i data-lucide="panel-top"></i><span>Sin escenarios suficientes</span></div>

@@ -16,6 +16,7 @@ from config import (
     heatmap_output_file,
     iou_value,
     model_name,
+    parking_frame_stride,
     parking_model_name,
     tracker_type,
     zone_report_file,
@@ -1038,6 +1039,7 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
     slot_sessions = []
     heatmap = np.zeros((frame_height, frame_width), dtype=np.float32)
     frame_count = 0
+    analyzed_frame_count = 0
     best_frame = None
     best_occupied = -1
     peak_occupied_slots = 0
@@ -1082,9 +1084,22 @@ def run_parking_analysis_job(analysis, output_dir, vision_utils, YOLO, cv2, np):
         if not ok:
             break
         frame_count += 1
+        should_process = frame_count == 1 or frame_count % max(1, parking_frame_stride) == 0
+        if not should_process:
+            if total_frames and frame_count % max(1, parking_frame_stride * 2) == 0:
+                progress_value = min(94, int((frame_count / max(total_frames, 1)) * 94))
+                update_analysis(
+                    analysis.pk,
+                    progress=progress_value,
+                    processed_frames=frame_count,
+                    status_message="Muestreando video para ocupacion de estacionamientos",
+                )
+            continue
+
+        analyzed_frame_count += 1
         current_time = frame_count / fps if fps else 0
         bin_row = ensure_time_bin(current_time)
-        detailed_scan = frame_count % 12 == 0
+        detailed_scan = analyzed_frame_count % 6 == 0
         detections = vehicle_detections(frame, detailed=detailed_scan)
 
         occupied_now = set()

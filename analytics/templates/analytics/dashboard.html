@@ -336,6 +336,20 @@
         <small>{{ ai_analyst.status }}</small>
         <i data-lucide="chevron-down"></i>
       </summary>
+      <div class="actions enterprise-inline-actions">
+        {% if ai_analyst_refresh_enabled %}
+          <form method="post" action="{% url 'force_ai_analyst' analysis.pk %}">
+            {% csrf_token %}
+            <button class="ghost-button" type="submit" title="{{ ai_analyst_refresh_reason }}">
+              <i data-lucide="sparkles"></i><span>Forzar respuesta IA</span>
+            </button>
+          </form>
+        {% else %}
+          <button class="ghost-button" type="button" disabled title="{{ ai_analyst_refresh_reason }}">
+            <i data-lucide="sparkles"></i><span>Respuesta IA vigente</span>
+          </button>
+        {% endif %}
+      </div>
       <ul class="presentation-list">
         {% for line in ai_analyst.narrative %}
           <li>{{ line }}</li>

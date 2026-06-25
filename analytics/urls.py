@@ -26,6 +26,7 @@ urlpatterns = [
     path("analyses/<uuid:pk>/progress/", views.analysis_progress, name="analysis_progress"),
     path("analyses/<uuid:pk>/results/", views.analysis_results, name="analysis_results"),
     path("analyses/<uuid:pk>/presentation/", views.analysis_presentation, name="analysis_presentation"),
+    path("analyses/<uuid:pk>/insights/force-ai/", views.force_ai_analyst, name="force_ai_analyst"),
     path("analyses/<uuid:pk>/insights/note/", views.save_insight_note, name="save_insight_note"),
     path("analyses/<uuid:pk>/zones/versions/<int:version_id>/restore/", views.restore_zone_version, name="restore_zone_version"),
     path("reports/", views.reports, name="reports"),

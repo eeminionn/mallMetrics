@@ -45,6 +45,8 @@ REPORT_LABELS = {
     "dwell": "Permanencia",
 }
 
+AI_ANALYST_CACHE_KEY = "ai_analyst_v1"
+
 METRIC_DICTIONARY = [
     {
         "key": "personas_validadas",
@@ -737,6 +739,25 @@ def openai_runtime_config():
     return api_key, model
 
 
+def cached_ai_analyst_note(analysis):
+    return InsightNote.objects.filter(analysis=analysis, insight_key=AI_ANALYST_CACHE_KEY).first()
+
+
+def cached_ai_analyst_payload(analysis):
+    cached = cached_ai_analyst_note(analysis)
+    if not cached:
+        return None, None
+    try:
+        return json.loads(cached.body), cached
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None, cached
+
+
+def has_fresh_ai_analyst(analysis):
+    payload, cached = cached_ai_analyst_payload(analysis)
+    return bool(payload and cached and cached.updated_at >= analysis.updated_at)
+
+
 def request_openai_analyst(analysis, summary, insights, alerts, comparison, video_quality, layout_scenarios):
     api_key, model = openai_runtime_config()
     if not api_key:
@@ -818,15 +839,10 @@ def ai_analyst_context(analysis, summary, insights, alerts, comparison, video_qu
     if not api_key:
         return fallback
 
-    cache_key = "ai_analyst_v1"
-    cached = InsightNote.objects.filter(analysis=analysis, insight_key=cache_key).first()
-    if cached and cached.updated_at >= analysis.updated_at:
-        try:
-            data = json.loads(cached.body)
-            data.update({"enabled": True, "source": "openai", "status": "Analisis generado por IA"})
-            return data
-        except (TypeError, ValueError, json.JSONDecodeError):
-            pass
+    data, cached = cached_ai_analyst_payload(analysis)
+    if data and cached and cached.updated_at >= analysis.updated_at:
+        data.update({"enabled": True, "source": "openai", "status": "Analisis generado por IA"})
+        return data
 
     generated = request_openai_analyst(analysis, summary, insights, alerts, comparison, video_quality, layout_scenarios)
     if not generated:
@@ -835,7 +851,7 @@ def ai_analyst_context(analysis, summary, insights, alerts, comparison, video_qu
 
     InsightNote.objects.update_or_create(
         analysis=analysis,
-        insight_key=cache_key,
+        insight_key=AI_ANALYST_CACHE_KEY,
         defaults={"body": json.dumps(generated, ensure_ascii=False)},
     )
     return generated
@@ -1343,6 +1359,14 @@ def dashboard_context(analysis=None, overview_analyses=None):
     scenarios = layout_scenario_rows(chart_payload["friction"])
     narrative = narrative_summary(analysis, summary, insights, alerts, comparison, video_quality)
     ai_analyst = ai_analyst_context(analysis, summary, insights, alerts, comparison, video_quality, scenarios)
+    api_key, _model = openai_runtime_config()
+    ai_analyst_refresh_enabled = bool(api_key) and not has_fresh_ai_analyst(analysis)
+    if not api_key:
+        ai_analyst_refresh_reason = "Configura tu API key de OpenAI para habilitar esta accion."
+    elif has_fresh_ai_analyst(analysis):
+        ai_analyst_refresh_reason = "Este analisis ya tiene una respuesta IA vigente."
+    else:
+        ai_analyst_refresh_reason = "Genera o regenera la narrativa automatica con OpenAI."
     insight_notes = {
         note.insight_key: note
         for note in InsightNote.objects.filter(analysis=analysis)
@@ -1367,6 +1391,8 @@ def dashboard_context(analysis=None, overview_analyses=None):
         "layout_scenarios": scenarios,
         "narrative_summary": narrative,
         "ai_analyst": ai_analyst,
+        "ai_analyst_refresh_enabled": ai_analyst_refresh_enabled,
+        "ai_analyst_refresh_reason": ai_analyst_refresh_reason,
         "metric_dictionary": METRIC_DICTIONARY,
         "insight_notes": insight_notes,
         "zone_versions": analysis.zone_versions.select_related("created_by")[:6],

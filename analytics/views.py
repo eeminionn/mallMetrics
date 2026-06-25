@@ -25,6 +25,7 @@ from .analysis_engine import run_analysis_job
 from .forms import AppConfigurationForm, MallForm, VideoUploadForm
 from .models import AnalysisAuditLog, AnalysisRun, AppConfiguration, InsightNote, Mall, ZoneVersion
 from .services import (
+    AI_ANALYST_CACHE_KEY,
     build_analysis_zip_bytes,
     build_executive_pdf_bytes,
     build_executive_pptx_bytes,
@@ -32,9 +33,29 @@ from .services import (
     build_mall_executive_pdf_bytes,
     build_mall_executive_pptx_bytes,
     dashboard_context,
+    has_fresh_ai_analyst,
+    openai_runtime_config,
     prepare_video_metadata,
+    request_openai_analyst,
     reports_context,
     slug_token,
+    build_summary,
+    read_csv_dicts,
+    report_path,
+    REPORT_FILES,
+    ranking_rows,
+    zone_activity_rows,
+    spatial_zone_rows,
+    time_series_rows,
+    traffic_surface_payload,
+    friction_rows as build_friction_rows,
+    trajectory_cluster_rows,
+    stair_rows_for_chart,
+    operational_insights,
+    video_quality_score,
+    operational_alerts,
+    analysis_comparison,
+    layout_scenario_rows,
 )
 
 
@@ -396,6 +417,61 @@ def analysis_results(request, pk):
 def analysis_presentation(request, pk):
     analysis = get_object_or_404(AnalysisRun, pk=pk)
     return render(request, "analytics/presentation.html", dashboard_context(analysis))
+
+
+@login_required
+@require_POST
+@role_required(ROLE_ADMIN, ROLE_ANALYST, ROLE_SUPERVISOR)
+def force_ai_analyst(request, pk):
+    analysis = get_object_or_404(AnalysisRun, pk=pk)
+    api_key, _model = openai_runtime_config()
+    if not api_key:
+        messages.error(request, "Configura una API key de OpenAI antes de forzar la narrativa IA.")
+        return redirect("analysis_results", pk=analysis.pk)
+
+    if has_fresh_ai_analyst(analysis):
+        messages.info(request, "Este analisis ya tiene una respuesta IA vigente.")
+        return redirect("analysis_results", pk=analysis.pk)
+
+    zone_rows = read_csv_dicts(REPORT_FILES["zones"], analysis)
+    zone_metric_rows = read_csv_dicts(REPORT_FILES["zone_metrics"], analysis)
+    store_rows = read_csv_dicts(REPORT_FILES["stores"], analysis)
+    time_rows = read_csv_dicts(REPORT_FILES["time_bins"], analysis)
+    stair_rows = read_csv_dicts(REPORT_FILES["stairs"], analysis)
+    summary_rows = read_csv_dicts(REPORT_FILES["summary"], analysis)
+    event_rows = read_csv_dicts(REPORT_FILES["events"], analysis)
+    people_rows = read_csv_dicts(REPORT_FILES["people"], analysis)
+
+    summary = summary_rows[0] if summary_rows else build_summary(zone_rows)
+    chart_payload = {
+        "ranking": ranking_rows(store_rows, zone_metric_rows, zone_rows),
+        "zoneActivity": zone_activity_rows(store_rows, zone_metric_rows, zone_rows),
+        "spatialZones": spatial_zone_rows(zone_rows, zone_metric_rows),
+        "time": time_series_rows(time_rows, analysis),
+        "trafficSurface": traffic_surface_payload(analysis, zone_rows, zone_metric_rows, time_rows, event_rows),
+        "friction": build_friction_rows(zone_metric_rows, zone_rows),
+        "clusters": trajectory_cluster_rows(people_rows),
+        "stairs": stair_rows_for_chart(stair_rows),
+    }
+    insights = operational_insights(analysis, zone_rows, zone_metric_rows, time_rows, event_rows)
+    video_quality = video_quality_score(analysis)
+    alerts = operational_alerts(analysis, summary, insights, chart_payload, zone_metric_rows, zone_rows, video_quality)
+    comparison = analysis_comparison(analysis, summary, chart_payload["ranking"])
+    scenarios = layout_scenario_rows(chart_payload["friction"])
+    generated = request_openai_analyst(analysis, summary, insights, alerts, comparison, video_quality, scenarios)
+
+    if not generated:
+        messages.error(request, "OpenAI no devolvio una respuesta valida. Revisa la API key, el modelo o el billing.")
+        return redirect("analysis_results", pk=analysis.pk)
+
+    InsightNote.objects.update_or_create(
+        analysis=analysis,
+        insight_key=AI_ANALYST_CACHE_KEY,
+        defaults={"body": json.dumps(generated, ensure_ascii=False), "created_by": request.user},
+    )
+    audit_event(request, AnalysisAuditLog.Action.NOTE_SAVE, analysis=analysis, mall=analysis.mall_group, insight_key="ai_analyst_force")
+    messages.success(request, "Narrativa IA generada con OpenAI.")
+    return redirect("analysis_results", pk=analysis.pk)
 
 
 @login_required

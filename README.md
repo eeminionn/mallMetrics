@@ -34,4 +34,6 @@ Luego abre `http://127.0.0.1:8001/` e inicia sesion con:
 - La ejecucion YOLO fue separada en `analytics/analysis_engine.py`.
 - Cada analisis guarda video, zonas, progreso y reportes en `AnalysisRun`.
 - Los CSV y heatmaps se exportan por analisis en `media/analysis/<analysis_id>/`.
+- La vista de resultados incluye highlights, alertas operativas, comparador historico, calidad de video, diccionario de metricas, notas de insight, versionado de zonas, auditoria, modo presentacion y exportacion ejecutiva PDF/PPTX.
+- Los reportes tecnicos siguen disponibles como descarga comprimida por analisis o por establecimiento.
 - El estudio de flujo UX esta en `docs/ux-flow-study.md`.

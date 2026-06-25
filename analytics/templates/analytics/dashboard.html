@@ -16,6 +16,8 @@
     </div>
   </header>
 
+  {% include "analytics/includes/global_filters.html" %}
+
   {% if mall_cards %}
     <section class="mall-summary-grid">
       {% for card in mall_cards %}
@@ -117,6 +119,7 @@
       <div class="analysis-page-heading">
         <h1 class="analysis-title">{{ analysis.display_name }}</h1>
         <div class="analysis-context">
+          <span class="type-pill"><i data-lucide="user-check"></i>{{ user_role }}</span>
           <span class="type-pill">{{ analysis.mall_label|default:"Sin establecimiento" }}</span>
           <span class="type-pill">{{ analysis.category_label|default:"General" }}</span>
           <span class="type-pill">{{ analysis.area_label|default:"Sin sector" }}</span>
@@ -130,6 +133,9 @@
         <a class="analysis-tab" href="{% url 'zone_editor' analysis.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
         <a class="analysis-tab" href="{% url 'download_analysis_report' analysis.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
         <a class="analysis-tab" href="{% url 'reports_for_analysis' analysis.pk %}"><i data-lucide="table-2"></i><span>Reportes</span></a>
+        <a class="analysis-tab" href="{% url 'download_executive_pdf' analysis.pk %}"><i data-lucide="file-text"></i><span>PDF ejecutivo</span></a>
+        <a class="analysis-tab" href="{% url 'download_executive_pptx' analysis.pk %}"><i data-lucide="presentation"></i><span>PPTX</span></a>
+        <a class="analysis-tab" href="{% url 'analysis_presentation' analysis.pk %}"><i data-lucide="monitor-play"></i><span>Modo presentacion</span></a>
       </nav>
       <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
     </div>
@@ -178,6 +184,71 @@
       <span>Horario minimo</span>
       <strong>{{ operational_insights.quiet_time.label }}</strong>
       <small>{{ operational_insights.quiet_time.value }} eventos</small>
+    </article>
+  </section>
+
+  <section class="enterprise-strip">
+    <article class="enterprise-panel">
+      <div class="panel-title">
+        <h2>Calidad del video</h2>
+        <span>{{ video_quality.score }}/100 · {{ video_quality.label }}</span>
+      </div>
+      <div class="quality-meter" style="--quality-score: {{ video_quality.score }}%;"><span></span></div>
+      <div class="analysis-meta">
+        {% for check in video_quality.checks %}
+          <span class="analysis-meta-item {% if check.ok %}status-completed{% else %}status-ready{% endif %}">
+            <i data-lucide="{% if check.ok %}check-circle-2{% else %}alert-circle{% endif %}"></i>
+            <strong>{{ check.label }}</strong> {{ check.value }}
+          </span>
+        {% endfor %}
+      </div>
+    </article>
+
+    <article class="enterprise-panel">
+      <div class="panel-title">
+        <h2>Alertas operativas</h2>
+        <span>{{ operational_alerts|length }}</span>
+      </div>
+      {% if operational_alerts %}
+        <ul class="alert-list">
+          {% for alert in operational_alerts %}
+            <li class="alert-item {{ alert.level }}">
+              <strong>{{ alert.title }}</strong>
+              <span>{{ alert.body }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state compact-empty"><i data-lucide="shield-check"></i><span>Sin alertas relevantes</span></div>
+      {% endif %}
+    </article>
+
+    <article class="enterprise-panel">
+      <div class="panel-title">
+        <h2>Comparador historico</h2>
+        {% if analysis_comparison %}<span>{{ analysis_comparison.analysis.display_name }}</span>{% else %}<span>Sin base previa</span>{% endif %}
+      </div>
+      {% if analysis_comparison %}
+        <div class="mini-kpi-grid">
+          <article class="mini-kpi">
+            <span>Personas</span>
+            <strong>{{ analysis_comparison.people.absolute|default:"0" }}</strong>
+            <small>{{ analysis_comparison.people.previous }} anterior · {{ analysis_comparison.people.current }} actual</small>
+          </article>
+          <article class="mini-kpi">
+            <span>Entradas</span>
+            <strong>{{ analysis_comparison.entries.absolute|default:"0" }}</strong>
+            <small>{{ analysis_comparison.entries.previous }} anterior · {{ analysis_comparison.entries.current }} actual</small>
+          </article>
+          <article class="mini-kpi">
+            <span>Zona lider</span>
+            <strong>{{ analysis_comparison.top_zone }}</strong>
+            <small>Ranking actual</small>
+          </article>
+        </div>
+      {% else %}
+        <div class="empty-state compact-empty"><i data-lucide="git-compare-arrows"></i><span>Se activara al existir otro analisis comparable</span></div>
+      {% endif %}
     </article>
   </section>
 
@@ -234,6 +305,155 @@
     </article>
   </section>
 
+  <section class="enterprise-grid">
+    <details class="enterprise-panel" open>
+      <summary>
+        <span><i data-lucide="sparkles"></i> Narrativa automatica y notas</span>
+        <i data-lucide="chevron-down"></i>
+      </summary>
+      <ul class="presentation-list">
+        {% for line in narrative_summary %}
+          <li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+      <form class="note-form" method="post" action="{% url 'save_insight_note' analysis.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="insight_key" value="executive_summary">
+        <label for="executiveNote">Interpretacion del analista</label>
+        <textarea id="executiveNote" name="body" placeholder="Ej: el peak coincide con cambio de turno o apertura de cajas">{{ insight_notes.executive_summary.body }}</textarea>
+        <button class="ghost-button" type="submit"><i data-lucide="message-square-plus"></i><span>Guardar nota</span></button>
+      </form>
+    </details>
+
+    <details class="enterprise-panel" open>
+      <summary>
+        <span><i data-lucide="traffic-cone"></i> Friccion y simulador de layout</span>
+        <i data-lucide="chevron-down"></i>
+      </summary>
+      {% if friction_rows %}
+        <div class="table-wrap compact-table">
+          <table>
+            <thead><tr><th>Zona</th><th>Indice</th><th>Entradas</th><th>Permanencia</th></tr></thead>
+            <tbody>
+              {% for row in friction_rows %}
+                <tr data-zone-label="{{ row.label }}">
+                  <td>{{ row.label }}</td>
+                  <td>{{ row.score }}</td>
+                  <td>{{ row.entries }}</td>
+                  <td>{{ row.dwell }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="study-list">
+          {% for scenario in layout_scenarios %}
+            <article class="mini-kpi">
+              <span>{{ scenario.impact }}</span>
+              <strong>{{ scenario.title }}</strong>
+              <small>{{ scenario.body }}</small>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state compact-empty"><i data-lucide="panel-top"></i><span>Sin datos suficientes para simular redistribucion</span></div>
+      {% endif %}
+    </details>
+
+    <details class="enterprise-panel">
+      <summary>
+        <span><i data-lucide="route"></i> Clustering de trayectorias</span>
+        <i data-lucide="chevron-down"></i>
+      </summary>
+      {% if trajectory_clusters %}
+        <div class="table-wrap compact-table">
+          <table>
+            <thead><tr><th>Ruta dominante</th><th>Personas</th><th>Tiempo visible</th><th>Distancia px</th></tr></thead>
+            <tbody>
+              {% for row in trajectory_clusters %}
+                <tr>
+                  <td>{{ row.label }}</td>
+                  <td>{{ row.count }}</td>
+                  <td>{{ row.avg_visible }}</td>
+                  <td>{{ row.avg_distance }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state compact-empty"><i data-lucide="route-off"></i><span>Se activa cuando los tracks incluyen zona inicial y final</span></div>
+      {% endif %}
+    </details>
+
+    <details class="enterprise-panel">
+      <summary>
+        <span><i data-lucide="book-open"></i> Diccionario de metricas</span>
+        <i data-lucide="chevron-down"></i>
+      </summary>
+      <ul class="metric-dictionary">
+        {% for metric in metric_dictionary %}
+          <li class="alert-item">
+            <strong>{{ metric.name }}</strong>
+            <span>{{ metric.formula }}</span>
+            <small>{{ metric.source }} · {{ metric.confidence }}</small>
+          </li>
+        {% endfor %}
+      </ul>
+    </details>
+
+    <details class="enterprise-panel">
+      <summary>
+        <span><i data-lucide="git-branch"></i> Versionado de zonas</span>
+        <i data-lucide="chevron-down"></i>
+      </summary>
+      {% if zone_versions %}
+        <div class="study-list">
+          {% for version in zone_versions %}
+            <article class="report-analysis-item">
+              <div>
+                <strong>v{{ version.version }}</strong>
+                <p>{{ version.note|default:"Sin nota" }} · {{ version.created_at|date:"d/m/Y H:i" }}</p>
+              </div>
+              <form method="post" action="{% url 'restore_zone_version' analysis.pk version.pk %}">
+                {% csrf_token %}
+                <button class="ghost-button" type="submit"><i data-lucide="history"></i><span>Restaurar</span></button>
+              </form>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state compact-empty"><i data-lucide="git-branch"></i><span>Las versiones apareceran al guardar zonas</span></div>
+      {% endif %}
+    </details>
+
+    <details class="enterprise-panel">
+      <summary>
+        <span><i data-lucide="shield-check"></i> Auditoria</span>
+        <i data-lucide="chevron-down"></i>
+      </summary>
+      {% if audit_logs %}
+        <div class="table-wrap compact-table">
+          <table>
+            <thead><tr><th>Accion</th><th>Usuario</th><th>Fecha</th><th>Detalle</th></tr></thead>
+            <tbody>
+              {% for log in audit_logs %}
+                <tr>
+                  <td>{{ log.get_action_display }}</td>
+                  <td>{{ log.actor|default:"Sistema" }}</td>
+                  <td>{{ log.created_at|date:"d/m/Y H:i" }}</td>
+                  <td>{{ log.metadata }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state compact-empty"><i data-lucide="shield"></i><span>Sin eventos auditados para este analisis</span></div>
+      {% endif %}
+    </details>
+  </section>
+
   <section class="panel data-panel">
     <div class="panel-title">
       <h2>Detalle por zona</h2>
@@ -254,7 +474,7 @@
           </thead>
           <tbody>
             {% for row in zone_rows %}
-              <tr>
+              <tr data-zone-label="{{ row.zone_name|default:row.zone_id }}">
                 <td>{{ row.zone_name|default:row.zone_id }}</td>
                 <td><span class="type-pill">{{ row.zone_type }}</span></td>
                 <td>{{ row.entry_count|default:"0" }}</td>
@@ -279,6 +499,7 @@
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <script>
   const chartData = {{ chart_payload|safe }};
+  const videoPlayer = document.querySelector(".analysis-video-player");
   const palette = ["#2563eb", "#F4F7F5", "#D6FF72", "#FF5F7A", "#38bdf8", "#93C5FD", "#8CA4C8", "#E6F0FF"];
   Chart.defaults.color = "#A8B6D6";
   Chart.defaults.borderColor = "#263a63";
@@ -292,6 +513,21 @@
     return String(label || "").split(" - ").map((part) => part.split(":").slice(0, 2).join(":")).join(" - ");
   }
 
+  function highlightZone(label) {
+    const normalized = String(label || "").trim().toLowerCase();
+    document.querySelectorAll("[data-zone-label]").forEach(row => {
+      const isMatch = normalized && String(row.dataset.zoneLabel || "").trim().toLowerCase() === normalized;
+      row.classList.toggle("data-row-selected", isMatch);
+      if (isMatch) row.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
+  function seekVideo(seconds) {
+    if (!videoPlayer || Number.isNaN(Number(seconds))) return;
+    videoPlayer.currentTime = Math.max(0, Number(seconds));
+    videoPlayer.play().catch(() => {});
+  }
+
   if (hasRows(chartData.ranking)) {
     new Chart(document.getElementById("rankingChart"), {
       type: "bar",
@@ -299,7 +535,16 @@
         labels: chartData.ranking.map(row => row.label),
         datasets: [{ data: chartData.ranking.map(row => row.value), backgroundColor: "#2563eb", borderRadius: 4 }]
       },
-      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        onClick: (_event, activeElements) => {
+          const active = activeElements?.[0];
+          if (active) highlightZone(chartData.ranking[active.index]?.label);
+        },
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true } }
+      }
     });
   }
 
@@ -313,7 +558,15 @@
           { label: "Eventos", data: chartData.time.map(row => row.events), borderColor: "#D6FF72", tension: .28 }
         ]
       },
-      options: { responsive: true, plugins: { legend: { position: "bottom" } }, scales: { y: { beginAtZero: true } } }
+      options: {
+        responsive: true,
+        onClick: (_event, activeElements) => {
+          const active = activeElements?.[0];
+          if (active) seekVideo(chartData.time[active.index]?.start);
+        },
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true } }
+      }
     });
   }
 

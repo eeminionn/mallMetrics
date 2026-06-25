@@ -23,6 +23,8 @@
   <div class="actions">
     <a class="ghost-button" href="{% url 'analysis_list' %}"><i data-lucide="folder-kanban"></i><span>Analisis</span></a>
     {% if analysis %}
+      <a class="ghost-button" href="{% url 'download_executive_pdf' analysis.pk %}"><i data-lucide="file-text"></i><span>PDF ejecutivo</span></a>
+      <a class="ghost-button" href="{% url 'download_executive_pptx' analysis.pk %}"><i data-lucide="presentation"></i><span>PPTX ejecutivo</span></a>
       <a class="primary-button" href="{% url 'download_analysis_report' analysis.pk %}"><i data-lucide="download"></i><span>Descargar reporte del analisis</span></a>
     {% endif %}
   </div>
@@ -57,6 +59,7 @@
                       </div>
                       <div class="actions">
                         <a class="ghost-button" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Ver reporte</span></a>
+                        <a class="ghost-button" href="{% url 'download_executive_pdf' item.pk %}"><i data-lucide="file-text"></i><span>PDF ejecutivo</span></a>
                         <a class="ghost-button" href="{% url 'download_analysis_report' item.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
                       </div>
                     </div>
@@ -71,6 +74,8 @@
             </details>
           </div>
           <div class="study-actions">
+            <a class="ghost-button" href="{% url 'download_mall_executive_pdf' row.mall.pk %}"><i data-lucide="file-text"></i><span>PDF ejecutivo</span></a>
+            <a class="ghost-button" href="{% url 'download_mall_executive_pptx' row.mall.pk %}"><i data-lucide="presentation"></i><span>PPTX ejecutivo</span></a>
             <a class="primary-button" href="{% url 'download_mall_report' row.mall.pk %}"><i data-lucide="archive"></i><span>Descargar reporte</span></a>
           </div>
         </article>
@@ -131,6 +136,7 @@
           </div>
           <div class="study-actions">
             <a class="ghost-button" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Ver reporte</span></a>
+            <a class="ghost-button" href="{% url 'download_executive_pdf' item.pk %}"><i data-lucide="file-text"></i><span>PDF ejecutivo</span></a>
             <a class="ghost-button" href="{% url 'download_analysis_report' item.pk %}"><i data-lucide="download"></i><span>Descargar reporte</span></a>
           </div>
         </article>

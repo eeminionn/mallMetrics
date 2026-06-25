@@ -39,32 +39,9 @@
       <button class="primary-button" type="submit"><i data-lucide="building-2"></i><span>Crear establecimiento</span></button>
     </div>
   </form>
-
-  <details class="filter-dropdown embedded-filter">
-    <summary class="ghost-button">
-      <i data-lucide="sliders-horizontal"></i>
-      <span>Filtrar</span>
-      {% if selected_category %}<span class="type-pill">{{ selected_category }}</span>{% endif %}
-    </summary>
-    <form class="filter-dropdown-panel" method="get">
-      <div class="panel-title">
-        <h2>Filtrar tablero</h2>
-        <span>{{ analyses|length }} analisis</span>
-      </div>
-      <div class="field-group">
-        <label for="categoryFilter">Categoria</label>
-        <input id="categoryFilter" name="category" list="categoryOptions" type="text" value="{{ selected_category }}" placeholder="Todas las categorias">
-        <datalist id="categoryOptions">
-          {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
-        </datalist>
-      </div>
-      <div class="filter-actions">
-        <button class="ghost-button" type="submit"><i data-lucide="filter"></i><span>Aplicar</span></button>
-        <a class="ghost-button" href="{% url 'mall_board' %}"><i data-lucide="x"></i><span>Limpiar</span></a>
-      </div>
-    </form>
-  </details>
 </section>
+
+{% include "analytics/includes/global_filters.html" %}
 
 <div id="boardCsrfTokenHolder" class="hidden">{% csrf_token %}</div>
 
@@ -166,7 +143,7 @@
                 <nav class="analysis-tabs" aria-label="Acciones del analisis">
                   <a class="analysis-tab" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
                   <a class="analysis-tab status-{{ item.status }}" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>{{ item.get_status_display }}</span></a>
-                  <a class="analysis-tab" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
+                  <a class="analysis-tab" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Reportes</span></a>
                   {% if item.status == "completed" %}
                     <a class="analysis-tab is-emphasis" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Ver resultado</span></a>
                   {% endif %}

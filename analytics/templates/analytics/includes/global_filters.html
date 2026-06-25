@@ -1,0 +1,66 @@
+<details class="filter-dropdown global-filter">
+  <summary class="ghost-button">
+    <i data-lucide="sliders-horizontal"></i>
+    <span>Filtros globales</span>
+    {% if selected_filters.mall %}<span class="type-pill">{{ selected_filters.mall }}</span>{% endif %}
+    {% if selected_filters.category %}<span class="type-pill">{{ selected_filters.category }}</span>{% endif %}
+    {% if selected_filters.area %}<span class="type-pill">{{ selected_filters.area }}</span>{% endif %}
+    {% if selected_filters.zone %}<span class="type-pill">{{ selected_filters.zone }}</span>{% endif %}
+    {% if selected_filters.status %}
+      {% for value, label in status_options %}
+        {% if selected_filters.status == value %}<span class="type-pill">{{ label }}</span>{% endif %}
+      {% endfor %}
+    {% endif %}
+  </summary>
+  <form class="filter-dropdown-panel study-filter enterprise-filter" method="get">
+    <div class="field-group">
+      <label for="mallFilter">Establecimiento</label>
+      <input id="mallFilter" name="mall" list="globalMallOptions" type="text" value="{{ selected_filters.mall }}" placeholder="Todos">
+      <datalist id="globalMallOptions">
+        {% for establecimiento in mall_options %}<option value="{{ establecimiento }}"></option>{% endfor %}
+      </datalist>
+    </div>
+    <div class="field-group">
+      <label for="categoryFilter">Categoria</label>
+      <input id="categoryFilter" name="category" list="globalCategoryOptions" type="text" value="{{ selected_filters.category }}" placeholder="Todas">
+      <datalist id="globalCategoryOptions">
+        {% for category in category_options %}<option value="{{ category }}"></option>{% endfor %}
+      </datalist>
+    </div>
+    <div class="field-group">
+      <label for="areaFilter">Piso o sector</label>
+      <input id="areaFilter" name="area" list="globalAreaOptions" type="text" value="{{ selected_filters.area }}" placeholder="Todas">
+      <datalist id="globalAreaOptions">
+        {% for area in area_options %}<option value="{{ area }}"></option>{% endfor %}
+      </datalist>
+    </div>
+    <div class="field-group">
+      <label for="zoneFilter">Zona demarcada</label>
+      <input id="zoneFilter" name="zone" list="globalZoneOptions" type="text" value="{{ selected_filters.zone }}" placeholder="Todas">
+      <datalist id="globalZoneOptions">
+        {% for zone in zone_options %}<option value="{{ zone }}"></option>{% endfor %}
+      </datalist>
+    </div>
+    <div class="field-group">
+      <label for="statusFilter">Estado</label>
+      <select id="statusFilter" name="status" class="select-field">
+        <option value="">Todos</option>
+        {% for value, label in status_options %}
+          <option value="{{ value }}" {% if selected_filters.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field-group">
+      <label for="dateFromFilter">Desde</label>
+      <input id="dateFromFilter" name="date_from" type="date" value="{{ selected_filters.date_from }}">
+    </div>
+    <div class="field-group">
+      <label for="dateToFilter">Hasta</label>
+      <input id="dateToFilter" name="date_to" type="date" value="{{ selected_filters.date_to }}">
+    </div>
+    <div class="filter-actions">
+      <button class="ghost-button" type="submit"><i data-lucide="filter"></i><span>Aplicar</span></button>
+      <a class="ghost-button" href="{{ clear_url }}"><i data-lucide="x"></i><span>Limpiar</span></a>
+    </div>
+  </form>
+</details>

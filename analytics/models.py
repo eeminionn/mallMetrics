@@ -166,3 +166,103 @@ class AnalysisRun(models.Model):
             "output_dir",
             "updated_at",
         ])
+
+
+class InsightNote(models.Model):
+    analysis = models.ForeignKey(
+        AnalysisRun,
+        on_delete=models.CASCADE,
+        related_name="insight_notes",
+    )
+    insight_key = models.CharField(max_length=80, db_index=True)
+    body = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="insight_notes",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["insight_key"]
+        unique_together = [("analysis", "insight_key")]
+
+    def __str__(self):
+        return f"{self.analysis.display_name} / {self.insight_key}"
+
+
+class ZoneVersion(models.Model):
+    analysis = models.ForeignKey(
+        AnalysisRun,
+        on_delete=models.CASCADE,
+        related_name="zone_versions",
+    )
+    version = models.PositiveIntegerField(default=1)
+    zones = models.JSONField(default=list)
+    note = models.CharField(max_length=255, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="zone_versions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        unique_together = [("analysis", "version")]
+
+    def __str__(self):
+        return f"{self.analysis.display_name} v{self.version}"
+
+
+class AnalysisAuditLog(models.Model):
+    class Action(models.TextChoices):
+        UPLOAD = "upload", "Carga de video"
+        ZONES_SAVE = "zones_save", "Guardado de zonas"
+        RUN_START = "run_start", "Inicio de analisis"
+        RUN_CANCEL = "run_cancel", "Cancelacion"
+        REPORT_DOWNLOAD = "report_download", "Descarga de reporte"
+        EXECUTIVE_EXPORT = "executive_export", "Exportacion ejecutiva"
+        NOTE_SAVE = "note_save", "Nota de insight"
+        MOVE = "move", "Asignacion"
+        RENAME = "rename", "Renombrado"
+        UNASSIGN = "unassign", "Desasignacion"
+        DELETE = "delete", "Eliminacion"
+        MALL_CHANGE = "mall_change", "Cambio de establecimiento"
+
+    analysis = models.ForeignKey(
+        AnalysisRun,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="audit_logs",
+    )
+    mall = models.ForeignKey(
+        Mall,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="audit_logs",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="analysis_audit_logs",
+    )
+    action = models.CharField(max_length=40, choices=Action.choices)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        subject = self.analysis.display_name if self.analysis_id else self.mall.name if self.mall_id else "Sistema"
+        return f"{self.get_action_display()} / {subject}"

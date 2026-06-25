@@ -177,21 +177,51 @@
     buildTypeButtons();
   }
 
-  function showZoneTypeCreator() {
-    if (!zoneTypeCreator || !newZoneTypeName) return;
+  function focusZoneTypeCreator() {
+    if (!zoneTypeCreator || !newZoneTypeName) return false;
     zoneTypeCreator.hidden = false;
+    zoneTypeCreator.setAttribute("data-open", "true");
     newZoneTypeName.value = "";
     newZoneTypeName.focus();
+    newZoneTypeName.select();
+    zoneTypeCreator.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    return true;
   }
 
   function hideZoneTypeCreator() {
     if (!zoneTypeCreator) return;
     zoneTypeCreator.hidden = true;
+    zoneTypeCreator.removeAttribute("data-open");
   }
 
   function saveCustomZoneType() {
-    createCustomZoneType(newZoneTypeName?.value || "");
+    const label = newZoneTypeName?.value || "";
+    if (!label.trim()) {
+      newZoneTypeName?.focus();
+      return;
+    }
+    createCustomZoneType(label);
     hideZoneTypeCreator();
+  }
+
+  function createZoneTypeFromPrompt() {
+    const promptLabel = window.prompt("Nombre de la nueva zona", "");
+    if (!promptLabel || !promptLabel.trim()) return;
+    createCustomZoneType(promptLabel);
+    hideZoneTypeCreator();
+  }
+
+  function showZoneTypeCreator(event) {
+    event?.preventDefault();
+    const creatorVisible = focusZoneTypeCreator();
+    if (!creatorVisible) {
+      createZoneTypeFromPrompt();
+      return;
+    }
+    window.setTimeout(() => {
+      const creatorStillHidden = zoneTypeCreator.hidden || zoneTypeCreator.offsetParent === null;
+      if (creatorStillHidden) createZoneTypeFromPrompt();
+    }, 120);
   }
 
   function resizeCanvas() {

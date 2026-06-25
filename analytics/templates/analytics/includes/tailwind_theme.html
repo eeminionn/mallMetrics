@@ -703,6 +703,15 @@
       @apply mb-3 rounded-lg border border-line bg-carbon p-3;
     }
 
+    .zone-type-creator[hidden] {
+      display: none !important;
+    }
+
+    .zone-type-creator[data-open="true"] {
+      @apply block;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.16), 0 16px 36px rgba(2, 6, 23, 0.32);
+    }
+
     .zone-type-inline-input {
       @apply min-h-12 rounded-lg border border-signal bg-carbon px-3 py-2 text-sm font-semibold uppercase text-copy outline-none ring-2 ring-signal/20;
     }

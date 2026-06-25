@@ -614,11 +614,11 @@ else:
     BaseApp = ctk.CTk
 
 
-class PeopleMetricsApp(BaseApp):
+class PIPOLMETRICSApp(BaseApp):
     def __init__(self):
         super().__init__()
 
-        self.title("People Metrics")
+        self.title("PIPOLMETRICS")
         self.geometry("1280x780")
         self.minsize(950, 620)
         self.configure(fg_color=APP_BG)
@@ -880,7 +880,7 @@ class PeopleMetricsApp(BaseApp):
 
         logo_sub = ctk.CTkLabel(
             sidebar,
-            text="People Metrics",
+            text="PIPOLMETRICS",
             font=("Segoe UI", 14),
             text_color="#8C96A8",
         )
@@ -2622,7 +2622,7 @@ class PeopleMetricsApp(BaseApp):
 
 def main():
     init_database()
-    app = PeopleMetricsApp()
+    app = PIPOLMETRICSApp()
     app.mainloop()
 
 

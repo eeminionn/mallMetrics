@@ -1,8 +1,8 @@
-# Estudio de flujo UX - People Metrics
+# Estudio de flujo UX - PIPOLMETRICS
 
 ## Objetivo del producto
 
-People Metrics se reorganiza como una herramienta web para analistas de datos operativos. El foco no es solo ejecutar YOLO, sino convertir un video en un estudio auditable: zonas, eventos, metricas, heatmap y reportes.
+PIPOLMETRICS se reorganiza como una herramienta web para analistas de datos operativos. El foco no es solo ejecutar YOLO, sino convertir un video en un estudio auditable: zonas, eventos, metricas, heatmap y reportes.
 
 ## Usuario principal
 
@@ -31,7 +31,7 @@ Analista de datos u operaciones de espacios fisicos que necesita:
    - El proceso escribe salidas por estudio, no como archivos globales.
 
 4. Resultados
-   - El usuario ve KPIs, heatmap, ranking, serie temporal, tiendas y escaleras.
+   - El usuario ve KPIs, heatmap, ranking, serie temporal, zonas y direccionalidad.
    - Las tablas permiten trazabilidad por zona/evento.
 
 5. Reportes

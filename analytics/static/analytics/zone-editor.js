@@ -11,7 +11,7 @@
   const ctx = canvas.getContext("2d");
 
   let zones = Array.isArray(initialZones) ? initialZones.map(normalizeClientZone) : [];
-  let currentType = "puerta";
+  let currentType = "zona";
   let drawing = false;
   let draggingPoint = null;
   let start = null;

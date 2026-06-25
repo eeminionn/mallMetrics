@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Django command-line utility for People Metrics."""
+"""Django command-line utility for PIPOLMETRICS."""
 import os
 import sys
 

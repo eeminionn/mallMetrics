@@ -1,6 +1,6 @@
-# PeopleMetrics
+# PIPOLMETRICS
 
-Version generica de People Metrics para revisar flujo de personas, reportes CSV y mapas de calor desde el navegador.
+Version generica de PIPOLMETRICS para revisar flujo de personas, reportes CSV y mapas de calor desde el navegador.
 
 Branch principal de esta version: `PeopleMetrics`.
 

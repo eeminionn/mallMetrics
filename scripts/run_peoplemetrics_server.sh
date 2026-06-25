@@ -9,14 +9,14 @@ URL="http://${HOST}:${PORT}/"
 
 cd "$PROJECT_DIR"
 
-echo "People Metrics"
+echo "PIPOLMETRICS"
 echo "Proyecto: $PROJECT_DIR"
 echo "URL: $URL"
 echo
 
 if lsof -iTCP:${PORT} -sTCP:LISTEN -n -P >/dev/null 2>&1; then
   echo "Ya hay un proceso usando el puerto ${PORT}."
-  echo "Si ese proceso es People Metrics, abre:"
+  echo "Si ese proceso es PIPOLMETRICS, abre:"
   echo "$URL"
   echo
   read -r "?Presiona Enter para cerrar..."

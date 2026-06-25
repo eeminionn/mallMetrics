@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}People Metrics{% endblock %}</title>
+  <title>{% block title %}PIPOLMETRICS{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -24,10 +24,10 @@
     {% if user.is_authenticated %}
       <button id="sidebarBackdrop" class="sidebar-backdrop hidden lg:hidden" type="button" aria-label="Cerrar menu"></button>
       <aside id="appSidebar" class="sidebar" data-open="false">
-        <a class="brand" href="{% url 'dashboard' %}" aria-label="People Metrics">
+        <a class="brand" href="{% url 'dashboard' %}" aria-label="PIPOLMETRICS">
           <span class="brand-mark">PM</span>
           <span>
-            <strong>People Metrics</strong>
+            <strong>PIPOLMETRICS</strong>
             <small>People Intelligence</small>
           </span>
         </a>
@@ -60,7 +60,7 @@
           <div class="mobile-shell-title">
             <span class="brand-mark">PM</span>
             <span>
-              <strong>People Metrics</strong>
+              <strong>PIPOLMETRICS</strong>
               <small>People Intelligence</small>
             </span>
           </div>

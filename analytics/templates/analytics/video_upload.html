@@ -43,17 +43,13 @@
     <div class="file-upload-grid">
       <div class="file-picker-field">
         {{ form.video }}
-        <label class="file-select-card" for="{{ form.video.id_for_label }}">
-          <i data-lucide="file-video"></i>
-          <span>Seleccionar archivo</span>
-          <small id="videoSelectName">Ningun video seleccionado</small>
+        <label id="videoDropZone" class="drop-upload-card single-upload-card" for="{{ form.video.id_for_label }}">
+          <i data-lucide="upload-cloud"></i>
+          <strong>Arrastra y suelta</strong>
+          <span>o selecciona un video</span>
+          <small id="videoFileName">Ningun video seleccionado</small>
         </label>
       </div>
-      <label id="videoDropZone" class="drop-upload-card" for="{{ form.video.id_for_label }}">
-        <i data-lucide="upload-cloud"></i>
-        <strong>Arrastra y suelta</strong>
-        <span id="videoFileName">o selecciona un video</span>
-      </label>
     </div>
     {{ form.video.errors }}
     <button class="primary-button full" type="submit"><i data-lucide="arrow-right"></i><span>Continuar a zonas</span></button>
@@ -77,13 +73,11 @@
     const input = document.getElementById("{{ form.video.id_for_label }}");
     const dropZone = document.getElementById("videoDropZone");
     const fileName = document.getElementById("videoFileName");
-    const selectName = document.getElementById("videoSelectName");
-    if (!input || !dropZone || !fileName || !selectName) return;
+    if (!input || !dropZone || !fileName) return;
 
     const updateFileName = () => {
       const name = input.files?.[0]?.name || "";
-      fileName.textContent = name || "o selecciona un video";
-      selectName.textContent = name || "Ningun video seleccionado";
+      fileName.textContent = name || "Ningun video seleccionado";
     };
 
     ["dragenter", "dragover"].forEach((eventName) => {

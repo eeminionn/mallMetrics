@@ -557,7 +557,7 @@
     }
 
     .file-upload-grid {
-      @apply grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.75fr)];
+      @apply grid gap-3;
     }
 
     .file-picker-field {
@@ -594,7 +594,8 @@
     }
 
     .drop-upload-card strong,
-    .drop-upload-card span {
+    .drop-upload-card span,
+    .drop-upload-card small {
       @apply block;
     }
 
@@ -602,9 +603,17 @@
       @apply max-w-full truncate text-xs font-medium text-quiet;
     }
 
+    .drop-upload-card small {
+      @apply max-w-full truncate text-sm font-medium text-muted;
+    }
+
     .drop-upload-card.is-dragover {
       @apply border-signal bg-panel-2 text-copy;
       box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.28);
+    }
+
+    .single-upload-card {
+      @apply mx-auto min-h-32 w-full max-w-3xl gap-2 px-6 py-7;
     }
 
     .panel-heading h2 {

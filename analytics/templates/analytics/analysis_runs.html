@@ -1,6 +1,6 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Analisis | People Metrics{% endblock %}
+{% block title %}Analisis | PIPOLMETRICS{% endblock %}
 
 {% block content %}
 <header class="page-bar">
@@ -68,7 +68,7 @@
       {% for item in analyses %}
         <article class="study-row">
           <div>
-            <span class="analysis-status-overline status-{{ item.status }}">{{ item.get_status_display|lower }}</span>
+            <span class="analysis-status-overline status-{{ item.status }}">{{ item.get_status_display|upper }}</span>
             <div class="analysis-heading">
               <h2 class="analysis-title">{{ item.display_name }}</h2>
               <div class="analysis-context">
@@ -77,25 +77,19 @@
                 <span class="type-pill">{{ item.area_label|default:"Sin sector" }}</span>
               </div>
             </div>
-            <div class="analysis-meta">
-              <details class="meta-popover">
-                <summary class="analysis-meta-item" title="Fecha del analisis">
-                  <i data-lucide="calendar-days"></i>
-                  <strong>{{ item.created_at|date:"d" }}</strong>
-                </summary>
-                <div class="meta-popover-panel">
-                  <strong>{{ item.created_at|date:"d/m/Y" }}</strong><br>
-                  {{ item.created_at|date:"H:i" }} hrs
-                </div>
-              </details>
-              <span class="analysis-meta-item"><i data-lucide="video"></i><strong>{{ item.total_frames }}</strong> frames</span>
-              <span class="analysis-meta-item"><i data-lucide="scan"></i><strong>{{ item.frame_width }}x{{ item.frame_height }}</strong></span>
-            </div>
+            <details class="analysis-detail-toggle">
+              <summary><i data-lucide="info"></i><span>Mas detalle</span></summary>
+              <div class="analysis-meta">
+                <span class="analysis-meta-item"><i data-lucide="calendar-days"></i><strong>{{ item.created_at|date:"d/m" }}</strong></span>
+                <span class="analysis-meta-item"><i data-lucide="video"></i><strong>{{ item.total_frames }}</strong> frames</span>
+                <span class="analysis-meta-item"><i data-lucide="scan"></i><strong>{{ item.frame_width }}x{{ item.frame_height }}</strong></span>
+              </div>
+            </details>
           </div>
           <div class="study-actions">
             <nav class="analysis-tabs" aria-label="Acciones del analisis">
               <a class="analysis-tab" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
-              <a class="analysis-tab" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+              <a class="analysis-tab status-{{ item.status }}" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>{{ item.get_status_display }}</span></a>
               <a class="analysis-tab" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
               {% if item.status == "completed" %}
                 <a class="analysis-tab is-emphasis" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Ver resultado</span></a>

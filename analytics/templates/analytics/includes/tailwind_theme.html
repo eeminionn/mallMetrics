@@ -587,9 +587,32 @@
       min-height: 440px;
     }
 
+    .status-side-stack {
+      @apply grid gap-4;
+    }
+
+    .result-video-panel,
+    .zone-3d-panel {
+      @apply min-h-[420px];
+    }
+
     .preview-shell {
       @apply grid place-items-center overflow-hidden rounded-lg border border-line bg-[#030712];
       min-height: 360px;
+    }
+
+    .media-shell {
+      @apply p-3;
+    }
+
+    .analysis-video-player {
+      @apply h-full w-full rounded-lg border border-line bg-black object-contain;
+      min-height: 320px;
+      max-height: 460px;
+    }
+
+    .plotly-panel {
+      @apply min-h-[360px] overflow-hidden rounded-lg border border-line bg-[#030712];
     }
 
     .preview-shell .empty-state {
@@ -607,8 +630,16 @@
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
     }
 
+    .study-toolbar-card {
+      @apply relative mb-4 grid gap-4;
+    }
+
     .filter-dropdown {
       @apply relative mb-4 self-start;
+    }
+
+    .embedded-filter {
+      @apply mb-0 justify-self-start;
     }
 
     .filter-dropdown summary {
@@ -628,6 +659,11 @@
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
     }
 
+    .embedded-filter .filter-dropdown-panel {
+      @apply absolute right-0 top-full z-30;
+      width: min(28rem, calc(100vw - 3rem));
+    }
+
     .filter-actions {
       @apply flex flex-wrap items-end gap-2;
     }
@@ -637,11 +673,16 @@
     }
 
     .add-mall-form textarea {
-      min-height: 44px;
+      min-height: 46px;
+      resize: none;
     }
 
     .add-mall-fields {
       @apply grid gap-3;
+    }
+
+    .add-mall-fields .field-group {
+      @apply self-end;
     }
 
     .color-picker-row {
@@ -660,8 +701,26 @@
       @apply pb-2 text-xs leading-5 text-muted;
     }
 
+    .mall-board-scroll-hint {
+      @apply mb-3 grid gap-2;
+    }
+
+    .mall-board-scroll-hint span {
+      @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted;
+    }
+
+    .mall-board-scroll-track {
+      @apply h-1.5 w-full overflow-hidden rounded-full border border-line bg-carbon;
+    }
+
+    .mall-board-scroll-track span {
+      @apply block h-full w-40 rounded-full bg-signal;
+      background-image: linear-gradient(90deg, #2563eb 0%, #60a5fa 45%, rgba(96, 165, 250, 0.2) 100%);
+    }
+
     .mall-board {
       @apply grid gap-4 overflow-x-auto pb-2;
+      align-items: start;
     }
 
     .mall-column {
@@ -670,21 +729,40 @@
       border-left-width: 8px;
       border-left-color: var(--mall-accent, #2563eb);
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
-      grid-template-rows: auto minmax(0, 1fr);
-      min-height: 620px;
+      grid-template-rows: auto auto;
+      min-height: 360px;
+      align-self: start;
     }
 
     .mall-column-head {
       @apply flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between;
+      min-height: 7.5rem;
+    }
+
+    .mall-column-head .actions {
+      @apply shrink-0 flex-nowrap;
+    }
+
+    .mall-column-head > div:first-child {
+      @apply grid content-start;
     }
 
     .mall-column-head p {
-      @apply mt-2 text-sm;
+      @apply mt-1.5 text-sm;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .mall-column-head h2 {
+      @apply text-2xl leading-tight;
+      max-width: 13ch;
     }
 
     .mall-dropzone {
       @apply grid content-start gap-3 rounded-lg border border-dashed border-transparent p-1 transition;
-      min-height: 520px;
+      min-height: 250px;
     }
 
     .mall-dropzone.drag-over {
@@ -693,7 +771,34 @@
     }
 
     .mall-empty {
-      @apply grid min-h-40 place-items-center gap-2 rounded-lg border border-dashed border-line px-4 py-6 text-center text-sm text-quiet;
+      @apply grid min-h-32 place-items-center gap-2 rounded-lg border border-dashed border-line px-4 py-6 text-center text-sm text-quiet;
+    }
+
+    .compact-empty {
+      @apply min-h-24;
+    }
+
+    .assign-analysis-card {
+      @apply relative;
+    }
+
+    .assign-analysis-card > summary {
+      @apply grid min-h-28 cursor-pointer list-none place-items-center gap-2 rounded-lg border border-dashed border-line bg-carbon px-4 py-6 text-center text-sm font-semibold text-muted transition hover:border-signal hover:bg-panel-2 hover:text-copy;
+    }
+
+    .assign-analysis-card > summary::-webkit-details-marker,
+    .analysis-detail-toggle > summary::-webkit-details-marker,
+    .edit-analysis-menu > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .assign-analysis-card > summary svg {
+      @apply text-signal;
+    }
+
+    .assign-analysis-panel {
+      @apply absolute left-0 top-[calc(100%+.5rem)] z-20 grid max-h-80 w-full gap-2 overflow-y-auto rounded-lg border border-line bg-panel p-3;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
     }
 
     .study-card {
@@ -710,13 +815,17 @@
       @apply flex flex-wrap items-start justify-between gap-2.5;
     }
 
+    .study-card-head {
+      @apply flex-nowrap;
+    }
+
     .study-card-head > div,
     .study-row > div:first-child {
       @apply min-w-0;
     }
 
     .analysis-status-overline {
-      @apply mb-1 block text-[10px] font-semibold lowercase tracking-[0.12em] text-muted;
+      @apply mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted;
     }
 
     .analysis-heading {
@@ -795,11 +904,11 @@
     }
 
     .analysis-tabs {
-      @apply inline-flex max-w-full flex-wrap items-center gap-1 rounded-full border border-line bg-carbon p-1;
+      @apply inline-flex max-w-full flex-wrap items-center gap-1.5;
     }
 
     .analysis-tab {
-      @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-line hover:bg-panel-2 hover:text-copy;
+      @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-line bg-carbon px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-[#2563eb] hover:bg-panel-2 hover:text-copy;
     }
 
     .analysis-tab.is-emphasis {
@@ -811,11 +920,52 @@
       @apply mt-1.5 text-sm;
     }
 
+    .analysis-detail-toggle {
+      @apply relative;
+    }
+
+    .analysis-detail-toggle > summary {
+      @apply inline-flex min-h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-line bg-carbon px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-signal hover:text-copy;
+    }
+
+    .analysis-detail-toggle[open] {
+      @apply grid gap-1;
+    }
+
+    .edit-analysis-menu {
+      @apply relative shrink-0;
+    }
+
+    .edit-analysis-menu > summary {
+      @apply list-none;
+    }
+
+    .edit-analysis-panel {
+      @apply absolute right-0 top-[calc(100%+.5rem)] z-30 grid w-72 gap-3 rounded-lg border border-line bg-panel p-3;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+    }
+
     .compact {
       @apply items-start;
     }
 
     .compact .study-actions {
+      @apply justify-start;
+    }
+
+    .report-analysis-list {
+      @apply mt-3 grid gap-2.5;
+    }
+
+    .report-analysis-item {
+      @apply flex flex-wrap items-start justify-between gap-3 rounded-lg border border-line bg-[#08111f] p-3;
+    }
+
+    .report-analysis-item strong {
+      @apply text-sm text-copy;
+    }
+
+    .report-analysis-item .actions {
       @apply justify-start;
     }
 
@@ -879,7 +1029,7 @@
     }
 
     .study-actions {
-      @apply flex flex-wrap justify-end gap-2;
+      @apply flex flex-wrap justify-start gap-2;
     }
 
     .study-actions form {
@@ -955,6 +1105,11 @@
       align-items: start;
     }
 
+    .study-toolbar-card {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+    }
+
     .study-row {
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: start;
@@ -976,8 +1131,12 @@
     }
 
     .add-mall-fields {
-      grid-template-columns: minmax(14rem, 1.1fr) auto minmax(16rem, 1fr) auto;
+      grid-template-columns: minmax(13rem, 0.9fr) auto minmax(18rem, 1.05fr) auto;
       align-items: end;
+    }
+
+    .add-mall-fields .field-notes textarea {
+      height: 46px;
     }
 
     .mall-board {

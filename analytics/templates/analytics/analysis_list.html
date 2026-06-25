@@ -1,6 +1,6 @@
 {% extends "analytics/base.html" %}
 
-{% block title %}Establecimientos | People Metrics{% endblock %}
+{% block title %}Establecimientos | PIPOLMETRICS{% endblock %}
 
 {% block content %}
 <header class="page-bar">
@@ -12,19 +12,18 @@
   <a class="primary-button" href="{% url 'video_upload' %}"><i data-lucide="plus"></i><span>Nuevo analisis</span></a>
 </header>
 
-<section class="study-toolbar">
-  <form class="panel add-mall-form" method="post" action="{% url 'create_mall' %}">
+<section class="panel study-toolbar-card">
+  <form class="add-mall-form" method="post" action="{% url 'create_mall' %}">
     {% csrf_token %}
     <div class="panel-title">
       <h2>Agregar establecimiento</h2>
-      <span>Sin crear analisis</span>
     </div>
     <div class="add-mall-fields">
-      <div class="field-group">
-        <label for="{{ mall_form.name.id_for_label }}">Nombre del establecimiento</label>
+      <div class="field-group field-name">
+        <label for="{{ mall_form.name.id_for_label }}">Nombre</label>
         {{ mall_form.name }}
       </div>
-      <div class="field-group">
+      <div class="field-group field-color">
         <label for="{{ mall_form.accent_color.id_for_label }}">Color</label>
         <div class="color-picker-row">
           <div class="color-picker-shell">
@@ -33,7 +32,7 @@
           </div>
         </div>
       </div>
-      <div class="field-group">
+      <div class="field-group field-notes">
         <label for="{{ mall_form.notes.id_for_label }}">Notas operativas</label>
         {{ mall_form.notes }}
       </div>
@@ -41,7 +40,7 @@
     </div>
   </form>
 
-  <details class="filter-dropdown">
+  <details class="filter-dropdown embedded-filter">
     <summary class="ghost-button">
       <i data-lucide="sliders-horizontal"></i>
       <span>Filtrar</span>
@@ -69,6 +68,11 @@
 
 <div id="boardCsrfTokenHolder" class="hidden">{% csrf_token %}</div>
 
+<div class="mall-board-scroll-hint">
+  <span><i data-lucide="move-horizontal"></i><strong>Desplaza</strong> para ver mas establecimientos</span>
+  <div class="mall-board-scroll-track"><span></span></div>
+</div>
+
 <section class="mall-board">
   {% for column in board_columns %}
         <article class="mall-column" data-mall-id="{{ column.id }}" style="--mall-accent: {{ column.accent_color }};">
@@ -91,12 +95,40 @@
           </div>
 
       <div class="mall-dropzone" data-mall-id="{{ column.id }}">
+        {% if column.id %}
+          <details class="assign-analysis-card">
+            <summary>
+              <i data-lucide="file-up"></i>
+              <span>Asignar analisis</span>
+            </summary>
+            <div class="assign-analysis-panel">
+              {% if available_analyses %}
+                {% for available in available_analyses %}
+                  <form method="post" action="{% url 'move_analysis_to_mall' available.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="mall_id" value="{{ column.id }}">
+                    <input type="hidden" name="next" value="{% url 'mall_board' %}">
+                    <button class="ghost-button full" type="submit">
+                      <i data-lucide="plus"></i>
+                      <span>{{ available.display_name }}</span>
+                    </button>
+                  </form>
+                {% endfor %}
+              {% else %}
+                <div class="empty-state compact-empty">
+                  <i data-lucide="folder-check"></i>
+                  <span>No hay analisis libres</span>
+                </div>
+              {% endif %}
+            </div>
+          </details>
+        {% endif %}
         {% if column.items %}
           {% for item in column.items %}
             <article class="study-card" draggable="true" data-analysis-id="{{ item.pk }}">
               <div class="study-card-head">
                 <div>
-                  <span class="analysis-status-overline status-{{ item.status }}">{{ item.get_status_display|lower }}</span>
+                  <span class="analysis-status-overline status-{{ item.status }}">{{ item.get_status_display|upper }}</span>
                   <div class="analysis-heading">
                     <h3 class="analysis-title">{{ item.display_name }}</h3>
                     <div class="analysis-context">
@@ -104,30 +136,37 @@
                       {% if item.area_label %}<span class="type-pill">{{ item.area_label }}</span>{% endif %}
                     </div>
                   </div>
-                  <div class="analysis-meta">
-                    <details class="meta-popover">
-                      <summary class="analysis-meta-item" title="Fecha del analisis">
-                        <i data-lucide="calendar-days"></i>
-                        <strong>{{ item.created_at|date:"d" }}</strong>
-                      </summary>
-                      <div class="meta-popover-panel">
-                        <strong>{{ item.created_at|date:"d/m/Y" }}</strong><br>
-                        {{ item.created_at|date:"H:i" }} hrs
-                      </div>
-                    </details>
-                    <span class="analysis-meta-item"><i data-lucide="video"></i><strong>{{ item.total_frames }}</strong> frames</span>
-                    <span class="analysis-meta-item"><i data-lucide="scan"></i><strong>{{ item.frame_width }}x{{ item.frame_height }}</strong></span>
-                  </div>
                 </div>
-                <form method="post" action="{% url 'delete_analysis' item.pk %}" data-confirm-title="Eliminar analisis" data-confirm-message="Se eliminara {{ item.display_name }} y todos sus archivos generados." data-confirm-label="Eliminar analisis">
-                  {% csrf_token %}
-                  <button class="danger-button icon-button" type="submit" aria-label="Eliminar analisis" title="Eliminar analisis"><i data-lucide="trash-2"></i></button>
-                </form>
+                <details class="edit-analysis-menu">
+                  <summary class="ghost-button icon-button" aria-label="Editar analisis" title="Editar analisis"><i data-lucide="pencil"></i></summary>
+                  <div class="edit-analysis-panel">
+                    <form method="post" action="{% url 'rename_analysis' item.pk %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="next" value="{% url 'mall_board' %}">
+                      <label for="rename-{{ item.pk }}">Nombre</label>
+                      <input id="rename-{{ item.pk }}" name="name" type="text" value="{{ item.display_name }}">
+                      <button class="ghost-button full" type="submit"><i data-lucide="save"></i><span>Guardar nombre</span></button>
+                    </form>
+                    <form method="post" action="{% url 'unassign_analysis' item.pk %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="next" value="{% url 'mall_board' %}">
+                      <button class="ghost-button full" type="submit"><i data-lucide="unlink"></i><span>Desasignar</span></button>
+                    </form>
+                  </div>
+                </details>
               </div>
+              <details class="analysis-detail-toggle">
+                <summary><i data-lucide="info"></i><span>Mas detalle</span></summary>
+                <div class="analysis-meta">
+                  <span class="analysis-meta-item"><i data-lucide="calendar-days"></i><strong>{{ item.created_at|date:"d/m" }}</strong></span>
+                  <span class="analysis-meta-item"><i data-lucide="video"></i><strong>{{ item.total_frames }}</strong> frames</span>
+                  <span class="analysis-meta-item"><i data-lucide="scan"></i><strong>{{ item.frame_width }}x{{ item.frame_height }}</strong></span>
+                </div>
+              </details>
               <div class="study-actions">
                 <nav class="analysis-tabs" aria-label="Acciones del analisis">
                   <a class="analysis-tab" href="{% url 'zone_editor' item.pk %}"><i data-lucide="scan"></i><span>Zonas</span></a>
-                  <a class="analysis-tab" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>Estado</span></a>
+                  <a class="analysis-tab status-{{ item.status }}" href="{% url 'analysis_status' item.pk %}"><i data-lucide="activity"></i><span>{{ item.get_status_display }}</span></a>
                   <a class="analysis-tab" href="{% url 'reports_for_analysis' item.pk %}"><i data-lucide="database"></i><span>Datos</span></a>
                   {% if item.status == "completed" %}
                     <a class="analysis-tab is-emphasis" href="{% url 'analysis_results' item.pk %}"><i data-lucide="bar-chart-3"></i><span>Ver resultado</span></a>
@@ -137,9 +176,9 @@
               </article>
           {% endfor %}
         {% else %}
-          <div class="mall-empty">
+          <div class="mall-empty compact-empty">
             <i data-lucide="inbox"></i>
-            <span>Suelta analisis aqui</span>
+            <span>Sin analisis asignados</span>
           </div>
         {% endif %}
       </div>
@@ -175,8 +214,8 @@
         let empty = zone.querySelector(".mall-empty");
         if (cards.length === 0 && !empty) {
           empty = document.createElement("div");
-          empty.className = "mall-empty";
-          empty.innerHTML = '<i data-lucide="inbox"></i><span>Suelta analisis aqui</span>';
+          empty.className = "mall-empty compact-empty";
+          empty.innerHTML = '<i data-lucide="inbox"></i><span>Sin analisis asignados</span>';
           zone.appendChild(empty);
           if (window.lucide) lucide.createIcons({ attrs: { width: 18, height: 18, "stroke-width": 2 } });
         } else if (cards.length > 0 && empty) {

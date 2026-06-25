@@ -89,6 +89,7 @@
 <script>
   const progressUrl = "{% url 'analysis_progress' analysis.pk %}";
   const resultsUrl = "{% url 'analysis_results' analysis.pk %}";
+  let currentPreviewUrl = "";
   const statusNames = {
     draft: "Borrador",
     ready: "Listo",
@@ -112,8 +113,16 @@
     document.getElementById("previewMeta").textContent = `${data.processed_frames} / ${data.total_frames}`;
     const previewFrame = document.getElementById("previewFrame");
     const previewEmpty = document.getElementById("previewEmpty");
-    if (data.preview_url) {
-      previewFrame.src = data.preview_url;
+    if (data.preview_url && data.preview_url !== currentPreviewUrl) {
+      const nextPreview = new Image();
+      nextPreview.onload = () => {
+        currentPreviewUrl = data.preview_url;
+        previewFrame.src = data.preview_url;
+        previewFrame.classList.remove("hidden");
+        previewEmpty.classList.add("hidden");
+      };
+      nextPreview.src = data.preview_url;
+    } else if (data.preview_url) {
       previewFrame.classList.remove("hidden");
       previewEmpty.classList.add("hidden");
     }

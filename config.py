@@ -9,6 +9,7 @@ parking_model_name = "yolo11x.pt"
 tracker_type = "bytetrack.yaml"
 
 confidence = 0.25
+parking_confidence = 0.18
 iou_value = 0.7
 
 # Más alto = menos rojo en el heatmap
@@ -30,6 +31,9 @@ parking_frame_stride = 4
 
 # Cantidad de frames procesados consecutivos sin deteccion antes de cerrar una sesion.
 parking_slot_miss_tolerance = 3
+
+# Si el mismo slot recupera deteccion rapidamente, se considera la misma sesion.
+parking_slot_reconnect_seconds = 10
 
 
 # ============================================================
